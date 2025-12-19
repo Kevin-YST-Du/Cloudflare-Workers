@@ -1,9 +1,9 @@
 /**
- * Worker Pro Editor - 绑定修复增强版
- * * 核心升级：
- * 1. 双重探测：同时请求 `/script` 和 `/settings` 接口，彻底解决“绑定不显示”问题。
- * 2. 权限容错：如果 Token 缺权限，会提示“获取设置失败”而不是默默显示无绑定。
- * 3. 完美 UI：WORKER PRO IDE (常规字体)、ID 明文、Token 切换、报错复制。
+ * Worker Pro Editor - 红色警告版
+ * 修改内容：
+ * 1. 部署确认按钮：改为红色 (bg-red-600)，强调操作风险。
+ * 2. 代码格式：CSS 和 HTML 结构完全展开，不再压缩。
+ * 3. 功能保持：修复 JSON 报错、双重变量探测、自动合并保护。
  */
 
 export default {
@@ -25,8 +25,12 @@ export default {
             const res = await fetch(url, options);
             const text = await res.text();
             let data;
-            try { data = JSON.parse(text); } 
-            catch (e) { data = { success: false, errors: [{ message: text || "API 响应非 JSON" }] }; }
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              // 捕获非 JSON 响应
+              data = { success: false, errors: [{ message: text || "API 响应非 JSON 格式" }] };
+            }
             return { ok: res.ok, status: res.status, data };
           } catch (err) {
             return { ok: false, data: { success: false, errors: [{ message: err.message }] } };
@@ -37,15 +41,14 @@ export default {
           headers: { 'Content-Type': 'application/json;charset=UTF-8' }
         });
 
-        // 获取脚本列表
+        // 1. 获取列表
         if (action === "listScripts") {
           const res = await safeFetch(baseUrl, { headers: authHeader });
           return jsonRes(res.data);
         }
 
-        // 验证并拉取 (双重探测绑定)
+        // 2. 验证并拉取 (双重探测绑定)
         if (action === "fetch") {
-          // 1. 获取代码
           const contentRes = await fetch(`${baseUrl}/${scriptName}`, { headers: authHeader });
           let code = "";
           const ct = contentRes.headers.get("content-type") || "";
@@ -57,24 +60,19 @@ export default {
             code = await contentRes.text();
           }
 
-          // 2. 获取 Metadata (路径 A)
+          // 探测 metadata
           const metaRes = await safeFetch(`${baseUrl}/${scriptName}`, {
             headers: { ...authHeader, 'Content-Type': 'application/json' }
           });
-
-          // 3. 获取 Settings (路径 B - 核心修复)
+          // 探测 settings (关键)
           const settingsRes = await safeFetch(`${baseUrl}/${scriptName}/settings`, {
             headers: { ...authHeader, 'Content-Type': 'application/json' }
           });
 
-          // 合并绑定信息
           let bindings = [];
-          
-          // 尝试从 settings 获取 (优先级高)
           if (settingsRes.ok && settingsRes.data.result) {
             bindings = settingsRes.data.result.bindings || [];
-          } 
-          // 如果 settings 空，尝试从 metadata 获取
+          }
           if (bindings.length === 0 && metaRes.ok && metaRes.data.result) {
             const r = metaRes.data.result;
             bindings = r.bindings || (r.settings && r.settings.bindings) || [];
@@ -83,11 +81,11 @@ export default {
           return jsonRes({ success: true, code, bindings });
         }
 
-        // 部署 (带变量保护)
+        // 3. 部署 (带变量保护)
         if (action === "deploy") {
           const code = formData.get("code");
           
-          // 部署前强制获取最新 Settings
+          // 部署前强制获取最新配置
           const settingsRes = await safeFetch(`${baseUrl}/${scriptName}/settings`, {
              headers: { ...authHeader, 'Content-Type': 'application/json' }
           });
@@ -131,26 +129,118 @@ function renderUI() {
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
-    :root { --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; }
-    .dark { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --border: #334155; }
-    body { background-color: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; padding: 2rem 1rem; margin: 0; min-height: 100vh; display: flex; justify-content: center; }
-    
-    .custom-content-wrapper { 
-      width: 75% !important; max-width: 1200px; padding: 2.5rem; border-radius: 1.5rem; background: var(--card); 
-      border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); 
+    /* CSS 样式 - 未压缩版本 */
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
     }
-    @media (max-width: 768px) { .custom-content-wrapper { width: 100% !important; padding: 1.25rem; } }
+
+    .dark {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --border: #334155;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      padding: 2rem 1rem;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
     
-    .binding-tag { display: inline-flex; align-items: center; padding: 0.2rem 0.6rem; border-radius: 0.4rem; font-size: 0.7rem; font-weight: 800; margin: 0.2rem; border: 1px solid var(--border); background: var(--bg); color: #2563eb; }
-    .binding-type { color: #64748b; margin-right: 0.3rem; text-transform: uppercase; font-size: 0.6rem; font-weight: 500; }
+    .custom-content-wrapper {
+      width: 75% !important;
+      max-width: 1200px;
+      padding: 2.5rem;
+      border-radius: 1.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+    }
 
-    #monaco-container { height: 50vh; border-radius: 0.75rem; border: 2px solid var(--border); overflow: hidden; margin: 1rem 0; background: #fff; }
+    @media (max-width: 768px) {
+      .custom-content-wrapper {
+        width: 100% !important;
+        padding: 1.25rem;
+      }
+    }
+    
+    /* 绑定变量标签样式 */
+    .binding-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 800;
+      margin: 0.2rem;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: #2563eb;
+    }
 
-    .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.8rem 2rem; border-radius: 1rem; color: white; opacity: 0; transition: 0.3s; z-index: 2000; text-align: center; pointer-events: auto !important; user-select: text !important; cursor: text; }
-    .toast.show { opacity: 1; }
+    .binding-type {
+      color: #64748b;
+      margin-right: 0.3rem;
+      text-transform: uppercase;
+      font-size: 0.6rem;
+      font-weight: 500;
+    }
 
-    .input-wrapper { position: relative; display: flex; align-items: center; }
-    .eye-icon { position: absolute; right: 1rem; cursor: pointer; color: #94a3b8; font-size: 1.2rem; user-select: none; }
+    /* 编辑器容器 */
+    #monaco-container {
+      height: 50vh;
+      border-radius: 0.75rem;
+      border: 2px solid var(--border);
+      overflow: hidden;
+      margin: 1rem 0;
+      background: #fff;
+    }
+
+    /* 消息提示 (Toast) */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.8rem 2rem;
+      border-radius: 1rem;
+      color: white;
+      opacity: 0;
+      transition: 0.3s;
+      z-index: 2000;
+      text-align: center;
+      pointer-events: auto !important;
+      user-select: text !important; /* 允许复制报错信息 */
+      cursor: text;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    /* Token 输入框 */
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .eye-icon {
+      position: absolute;
+      right: 1rem;
+      cursor: pointer;
+      color: #94a3b8;
+      font-size: 1.2rem;
+      user-select: none;
+    }
   </style>
 </head>
 <body class="light">
@@ -192,8 +282,8 @@ function renderUI() {
           IDE 将自动读取并合并云端现有的 <b>环境变量、KV、D1</b> 配置，确保仪表盘设置不丢失。
       </p>
       <div class="flex gap-3">
-        <button onclick="closeModal()" class="flex-1 py-4 rounded-xl font-bold bg-slate-100 text-slate-600">取消</button>
-        <button onclick="executeDeploy()" class="flex-1 py-4 rounded-xl font-bold bg-blue-600 text-white shadow-lg transition">确认部署</button>
+        <button onclick="closeModal()" class="flex-1 py-4 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">取消</button>
+        <button onclick="executeDeploy()" class="flex-1 py-4 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 transition">确认部署</button>
       </div>
     </div>
   </div>
