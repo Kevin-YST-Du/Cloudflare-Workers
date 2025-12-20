@@ -1,5 +1,5 @@
 /**
- * Worker Pro Editor - 红色警告版
+ * WorkerS Pro Editor - 红色警告版
  * 修改内容：
  * 1. 部署确认按钮：改为红色 (bg-red-600)，强调操作风险。
  * 2. 代码格式：CSS 和 HTML 结构完全展开，不再压缩。
@@ -110,7 +110,7 @@ export default {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Worker Pro IDE</title>
+    <title>WorkerS Pro IDE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <style>
@@ -231,7 +231,7 @@ export default {
     <div class="custom-content-wrapper">
       <button onclick="toggleTheme()" class="theme-toggle" id="theme-icon">☀️</button>
       
-      <h1 class="text-3xl font-blod text-center mb-8 text-blue-600 tracking-tighter uppercase">WORKER PRO IDE</h1>
+      <h1 class="text-3xl font-blod text-center mb-8 text-blue-600 tracking-tighter uppercase">WORKERS PRO IDE</h1>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <input id="aid" type="text" placeholder="Account ID" class="p-4 rounded-xl text-lg w-full shadow-inner outline-none">
@@ -259,8 +259,8 @@ export default {
       </button>
   
       <div class="footer-signature">
-        <a href="https://github.com/Kevin-YST-Du/Cloudflare-Accel" target="_blank" class="footer-link">
-          Powered by Kevin-YST-Du/Cloudflare-Accel
+        <a href="https://github.com/Kevin-YST-Du/Cloudflare-Workers" target="_blank" class="footer-link">
+          Powered by Kevin-YST-Du/Cloudflare-Workers
         </a>
       </div>
     </div>
