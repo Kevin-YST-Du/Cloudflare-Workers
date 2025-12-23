@@ -1,9 +1,9 @@
 /**
- * WorkerS Pro Editor - 红色警告版 + 移动端增强补丁
+ * WorkerS Pro Editor - 红色警告版 + 移动端增强补丁 (全选/复制/粘贴)
  * * 变更说明：
- * 1. 原有逻辑、样式、变量名完全未动。
- * 2. 仅在 fetch 按钮旁添加了 [全选] 和 [复制] 按钮。
- * 3. 仅添加了 editorSelectAll 和 editorCopyAll 两个新函数。
+ * 1. 严格保留原有“红色警告版”所有逻辑。
+ * 2. 新增 [粘贴] 按钮。
+ * 3. 新增 editorPaste 函数。
  */
 
 export default {
@@ -233,10 +233,11 @@ function renderUI() {
       padding: 0.25rem 0.75rem; 
       border-radius: 0.5rem; 
       margin-left: 0.5rem;
-      background-color: #3b82f6;
       color: white;
       font-weight: bold;
+      transition: opacity 0.2s;
     }
+    .mobile-action-btn:active { transform: scale(0.95); }
   </style>
 </head>
 <body class="light">
@@ -262,8 +263,9 @@ function renderUI() {
     <div class="flex justify-between items-center mb-2">
       <div>
           <button onclick="doAction('fetch')" class="text-blue-500 font-black hover:underline text-sm uppercase">验证并拉取代码</button>
-          <button onclick="editorSelectAll()" class="mobile-action-btn">全选</button>
-          <button onclick="editorCopyAll()" class="mobile-action-btn bg-slate-500">复制</button>
+          <button onclick="editorSelectAll()" class="mobile-action-btn bg-blue-500">全选</button>
+          <button onclick="editorCopyAll()" class="mobile-action-btn bg-green-500">复制</button>
+          <button onclick="editorPaste()" class="mobile-action-btn bg-blue-500">粘贴</button>
       </div>
       <div id="binding-container"></div>
     </div>
@@ -371,11 +373,10 @@ function renderUI() {
       btn.disabled = false; btn.innerText = "🚀 同步部署";
     }
 
-    // --- [新增] 移动端全选/复制逻辑 (不影响原有代码) ---
+    // --- [新增] 移动端 全选/复制/粘贴 逻辑 ---
     function editorSelectAll() {
       if (!editor) return;
       editor.focus();
-      // 强制选中所有模型内容
       editor.setSelection(editor.getModel().getFullModelRange());
       showToast("已全选");
     }
@@ -386,10 +387,30 @@ function renderUI() {
       navigator.clipboard.writeText(val).then(() => {
           showToast("已复制到剪贴板");
       }).catch(() => {
-          // 备用方案：先全选，提示用户手动复制
           editorSelectAll();
-          showToast("请手动点击“复制”");
+          showToast("复制失败，请手动长按复制", true);
       });
+    }
+
+    async function editorPaste() {
+      if (!editor) return;
+      editor.focus();
+      try {
+          const text = await navigator.clipboard.readText();
+          if(!text) return showToast("剪贴板为空", true);
+          
+          // 使用 executeEdits 在光标处插入，而非直接覆盖 (更安全)
+          // 如果用户先点了“全选”，这里就会自动覆盖全文
+          const selection = editor.getSelection();
+          editor.executeEdits('paste-source', [{
+              range: selection,
+              text: text,
+              forceMoveMarkers: true
+          }]);
+          showToast("已粘贴");
+      } catch(e) {
+          showToast("粘贴失败：请允许浏览器访问剪贴板", true);
+      }
     }
   </script>
 </body>
