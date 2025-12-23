@@ -263,9 +263,9 @@ function renderUI() {
     <div class="flex justify-between items-center mb-2">
       <div>
           <button onclick="doAction('fetch')" class="text-blue-500 font-black hover:underline text-sm uppercase">验证并拉取代码</button>
-          <button onclick="editorSelectAll()" class="mobile-action-btn bg-blue-500">全选</button>
+          <button onclick="editorSelectAll()" class="mobile-action-btn bg-green-500">全选</button>
           <button onclick="editorCopyAll()" class="mobile-action-btn bg-green-500">复制</button>
-          <button onclick="editorPaste()" class="mobile-action-btn bg-blue-500">粘贴</button>
+          <button onclick="editorPaste()" class="mobile-action-btn bg-green-500">粘贴</button>
       </div>
       <div id="binding-container"></div>
     </div>
