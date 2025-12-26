@@ -1,8 +1,6 @@
 # Workers Pro IDE (Editor) 部署与使用指南
 
-移动端增强补丁版 + 红色警告同步版
-
-这是一个轻量级的 Cloudflare Workers 在线集成开发环境 (IDE)。它允许你通过 API 直接拉取自己账号下的所有 Worker 脚本，在 Monaco Editor（VS Code 同款内核）中进行实时编辑，并一键同步部署回 Cloudflare。
+## 这是一个轻量级的 Cloudflare Workers 在线集成开发环境 (IDE)。它允许你通过 API 直接拉取自己账号下的所有 Worker 脚本，在 Monaco Editor（VS Code 同款内核）中进行实时编辑，并一键同步部署回 Cloudflare。
 
 ## ✨ 核心功能
 
