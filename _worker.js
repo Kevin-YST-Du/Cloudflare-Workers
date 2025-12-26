@@ -13,7 +13,7 @@ export default {
 
     // --- Token 生成辅助函数 ---
     const generateComplexToken = async () => {
-      const array = new Uint8Array(16);
+      const array = new Uint8Array(64);
       crypto.getRandomValues(array);
       const randomPart = Array.from(array, dec => dec.toString(16).padStart(2, "0")).join('');
       const uuid = crypto.randomUUID().replace(/-/g, '');
