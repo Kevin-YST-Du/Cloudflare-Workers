@@ -8,6 +8,15 @@ const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 
+// [新增] Node 18 兼容性补丁：确保 global.crypto 可用
+if (!global.crypto) {
+    try {
+        global.crypto = require('crypto').webcrypto;
+    } catch (e) {
+        console.warn("Crypto polyfill failed");
+    }
+}
+
 // 数据存储目录
 const DATA_DIR = path.join(process.cwd(), 'data');
 const KV_FILE = path.join(DATA_DIR, 'tokens.json');

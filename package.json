@@ -8,6 +8,16 @@
     "start": "node src/server.js",
     "build": "pkg . --out-path dist --compress GZip"
   },
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "assets": [],
+    "targets": [
+      "node18-linux-x64",
+      "node18-macos-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
   "dependencies": {
     "dotenv": "^16.3.1"
   },
