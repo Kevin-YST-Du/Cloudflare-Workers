@@ -12,8 +12,8 @@ COPY src ./src
 # 创建数据目录
 RUN mkdir -p /app/data
 
-# 暴露端口
-EXPOSE 3000
+# [修改点] 暴露端口 21111
+EXPOSE 21111
 
 # 启动命令
 CMD ["node", "src/server.js"]

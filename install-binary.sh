@@ -1,7 +1,7 @@
 #!/bin/bash
 # 请替换为你的实际 GitHub 用户名和版本号
 VERSION="4.7.0"
-# DOWNLOAD_URL="https://github.com/kevin-yst-du/workers/releases/download/v${VERSION}/workers-linux-x64"
+# DOWNLOAD_URL="https://github.com/你的用户名/workers/releases/download/v${VERSION}/workers-linux-x64"
 INSTALL_DIR="/opt/workers"
 
 echo ">>> 安装 Workers Pro Editor (二进制版)..."
@@ -31,7 +31,8 @@ User=root
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/workers
 Restart=always
-Environment=PORT=8899
+# [修改点] 端口环境变量
+Environment=PORT=21111
 
 [Install]
 WantedBy=multi-user.target
@@ -41,4 +42,4 @@ systemctl daemon-reload
 systemctl enable workers
 systemctl start workers
 
-echo ">>> 安装完成，服务运行在端口 8899"
+echo ">>> 安装完成，服务运行在端口 21111"

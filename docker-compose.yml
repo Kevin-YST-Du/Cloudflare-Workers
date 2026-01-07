@@ -7,9 +7,9 @@ services:
     build: .
     restart: always
     ports:
-      - "8899:3000"  # 外部端口 8899
+      - "21111:21111"  # [修改点] 外部:内部
     volumes:
-      - ./data:/app/data  # 持久化 Token 数据
+      - ./data:/app/data
     environment:
-      - PORT=3000
+      - PORT=21111     # [修改点] 内部端口
       - TZ=Asia/Shanghai

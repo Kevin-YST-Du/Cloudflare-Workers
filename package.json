@@ -8,17 +8,9 @@
     "start": "node src/server.js",
     "build": "pkg . --out-path dist --compress GZip"
   },
-  "pkg": {
-    "scripts": "src/**/*.js",
-    "assets": [],
-    "targets": [
-      "node20-linux-x64",
-      "node20-macos-x64",
-      "node20-win-x64"
-    ],
-    "outputPath": "dist"
+  "dependencies": {
+    "dotenv": "^16.3.1"
   },
-  "dependencies": {},
   "devDependencies": {
     "pkg": "^5.8.1"
   },

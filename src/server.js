@@ -1,17 +1,25 @@
+// ==========================================
+// 1. 初始化与配置读取
+// ==========================================
+require('dotenv').config(); // 读取 .env 文件
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 
-// ==========================================
-// 1. 环境适配层 (模拟 Cloudflare KV & Crypto)
-// ==========================================
+// 数据存储目录
 const DATA_DIR = path.join(process.cwd(), 'data');
 const KV_FILE = path.join(DATA_DIR, 'tokens.json');
 
 // 确保数据目录存在
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
+// ==========================================
+// 2. 环境适配层 (模拟 Cloudflare KV & Crypto)
+// ==========================================
 const KV_STORAGE = {
   async get(key, type = {}) {
     try {
@@ -25,15 +33,19 @@ const KV_STORAGE = {
     try {
       if (fs.existsSync(KV_FILE)) data = JSON.parse(fs.readFileSync(KV_FILE, 'utf8'));
     } catch (e) {}
-    // value 传入时已经是 stringify 过的字符串，这里为了本地 JSON 易读，我们解析后再存，或者直接存
-    // 为了保持跟 Worker KV 行为一致 (存字符串)，我们这里把 value 解析成对象存入大 JSON
-    data[key] = JSON.parse(value); 
+    // value 传入时是字符串，我们解析后再存，方便本地查看，或者直接存字符串也可以
+    // 这里为了保持兼容性，模拟 KV 的行为，存入大对象中
+    try {
+        data[key] = JSON.parse(value); 
+    } catch(e) {
+        data[key] = value;
+    }
     fs.writeFileSync(KV_FILE, JSON.stringify(data, null, 2));
   }
 };
 
 // ==========================================
-// 2. 业务逻辑 (WorkerS Pro Editor V4.7)
+// 3. 核心业务逻辑 (WorkerS Pro Editor V4.7)
 // ==========================================
 const workerLogic = {
   async fetch(request, env) {
@@ -44,7 +56,6 @@ const workerLogic = {
     // --- Token 生成辅助函数 ---
     const generateComplexToken = async () => {
       const array = new Uint8Array(64);
-      // Node.js 19+ 才有 global.crypto，旧版本需 polyfill，这里假设 Node 20
       crypto.getRandomValues(array);
       const randomPart = Array.from(array, dec => dec.toString(16).padStart(2, "0")).join('');
       const uuid = crypto.randomUUID().replace(/-/g, '');
@@ -95,7 +106,7 @@ const workerLogic = {
           if (action === 'listTokens') {
             const now = Date.now();
             
-            // [关键修改] 排序：a - b (小的在前，大的在后 -> 旧的在上，新的在下)
+            // [V4.7 关键逻辑] 排序：时间正序 (旧->新)
             tokens.sort((a, b) => a.created - b.created);
 
             tokens = tokens.map(t => ({
@@ -126,8 +137,8 @@ const workerLogic = {
               boundApiToken: apiToken
             };
 
-            // 插入新 Token
-            tokens.push(newToken); // 使用 push 放到末尾 (配合正序排序)
+            // 插入新 Token (push 到末尾，配合正序)
+            tokens.push(newToken);
             await env.KV_STORAGE.put(STORAGE_KEY, JSON.stringify(tokens));
             return jsonRes({ success: true, result: newToken });
           }
@@ -225,7 +236,6 @@ const workerLogic = {
   },
 
   renderUI() {
-    // 完整 UI 代码
     return `
  <!DOCTYPE html>
  <html lang="zh-CN">
@@ -730,9 +740,10 @@ const workerLogic = {
 };
 
 // ==========================================
-// 3. Node.js HTTP Server Entry Point
+// 4. Node.js HTTP Server Entry Point
 // ==========================================
-const PORT = process.env.PORT || 3000;
+// 优先使用 .env 中的 PORT，否则使用默认值 21111
+const PORT = process.env.PORT || 21111;
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -745,7 +756,7 @@ const server = http.createServer(async (req, res) => {
     const requestInit = {
       method: req.method,
       headers: headers,
-      duplex: 'half' 
+      duplex: 'half' // Node 18+ fetch 需要
     };
 
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -758,13 +769,20 @@ const server = http.createServer(async (req, res) => {
     
     const request = new Request(url, requestInit);
 
-    // 2. 调用 Worker 逻辑
-    const response = await workerLogic.fetch(request, { KV_STORAGE });
+    // 2. 构造环境变量 (混合 .env 和 KV)
+    const envParams = {
+        KV_STORAGE, 
+        ...process.env // 注入 .env 中的环境变量
+    };
 
-    // 3. 转换回 Node Response
+    // 3. 调用 Worker 逻辑
+    const response = await workerLogic.fetch(request, envParams);
+
+    // 4. 转换回 Node Response
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
     
+    // 处理流式响应
     if (response.body) {
       const reader = response.body.getReader();
       while (true) {
@@ -785,4 +803,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Workers] Server running on http://0.0.0.0:${PORT}`);
   console.log(`[Workers] Data directory: ${DATA_DIR}`);
+  console.log(`[Workers] Environment loaded from .env`);
 });
