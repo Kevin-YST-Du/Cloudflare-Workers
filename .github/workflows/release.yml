@@ -1,31 +1,67 @@
-name: Publish Binaries
+name: Build and Release Binaries
 
 on:
+  # 1. 自动触发：推送 v* 标签
   push:
-    tags: [ "v*" ]
+    tags:
+      - "v*"
+  # 2. 手动触发：允许输入版本号和说明
   workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如 v4.7.0)'
+        required: true
+        default: 'v4.7.0'
+      body:
+        description: '更新说明'
+        required: false
+        default: '手动构建发布'
 
 jobs:
   build-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # 必须有写权限才能发 Release
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup Node 18
+
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Install
+
+      - name: Install dependencies
         run: npm install
-      - name: Build
-        run: npm run build
+
+      - name: Build Binaries
+        # 这里对应 package.json 里的 scripts: build
+        run: |
+          npm run build
+          ls -l dist/
+
+      # --- 确定 Release 的标签名 ---
+      - name: Determine Tag Name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "name=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      # --- 发布 Release ---
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          # 使用上面计算出来的标签名
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Release ${{ steps.tag.outputs.name }}
+          body: ${{ inputs.body || 'Auto-generated release' }}
           files: dist/*
+          draft: false
+          prerelease: false
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
