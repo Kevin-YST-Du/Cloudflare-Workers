@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  workers:
+    image: workers:latest
+    container_name: workers_editor
+    build: .
+    restart: always
+    ports:
+      - "8899:3000"  # 外部端口 8899
+    volumes:
+      - ./data:/app/data  # 持久化 Token 数据
+    environment:
+      - PORT=3000
+      - TZ=Asia/Shanghai

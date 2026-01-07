@@ -1,0 +1,28 @@
+{
+  "name": "workers",
+  "version": "4.7.0",
+  "description": "WorkerS Pro Editor - Self Hosted",
+  "main": "src/server.js",
+  "bin": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "build": "pkg . --out-path dist --compress GZip"
+  },
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "assets": [],
+    "targets": [
+      "node20-linux-x64",
+      "node20-macos-x64",
+      "node20-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
