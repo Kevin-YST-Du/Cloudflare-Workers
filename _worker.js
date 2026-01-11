@@ -1,8 +1,10 @@
 /**
- * WorkerS Pro Editor V4.7 - 时间正序排列版 (旧->新)
+ * WorkerS Pro Editor V4.8 - 内存优化完整版
  * * * 变更说明：
- * 1. [排序] 修改为“时间正序”：旧的在最上面，最新的排在最下面。
- * 2. [保留] 包含之前所有功能 (UI美化、自定义天数、路径登录)。
+ * 1. [修复] 修复了网页挂机导致内存暴涨(10GB+)的问题。
+ * 2. [优化] 移除 automaticLayout 轮询，改用 ResizeObserver 原生监听。
+ * 3. [优化] 拉取代码时强制清理 Undo 栈，防止内存积压。
+ * 4. [保留] 包含之前所有功能 (时间正序、UI美化、Token管理)。
  */
 
 export default {
@@ -64,7 +66,7 @@ export default {
           if (action === 'listTokens') {
             const now = Date.now();
             
-            // [关键修改] 排序：a - b (小的在前，大的在后 -> 旧的在上，新的在下)
+            // [排序] 时间正序：旧的在上，新的在下 (a.created - b.created)
             tokens.sort((a, b) => a.created - b.created);
 
             tokens = tokens.map(t => ({
@@ -95,8 +97,8 @@ export default {
               boundApiToken: apiToken
             };
 
-            // 插入新 Token
-            tokens.push(newToken); // 使用 push 放到末尾 (配合正序排序)
+            // 使用 push 放到末尾 (配合正序排序)
+            tokens.push(newToken); 
             await env.KV_STORAGE.put(STORAGE_KEY, JSON.stringify(tokens));
             return jsonRes({ success: true, result: newToken });
           }
@@ -206,60 +208,238 @@ function renderUI() {
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <style>
-      :root { --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; --input-bg: #f8fafc; --input-text: #1e293b; --btn-bg: #e2e8f0; }
-      .dark { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --border: #334155; --input-bg: #0f172a; --input-text: #f8fafc; --btn-bg: #334155; }
-      body { background-color: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; padding: 2rem 1rem; margin: 0; min-height: 100vh; display: flex; justify-content: center; transition: 0.3s; }
+      :root { 
+        --bg: #f1f5f9; 
+        --card: #ffffff; 
+        --text: #1e293b; 
+        --border: #e2e8f0; 
+        --input-bg: #f8fafc; 
+        --input-text: #1e293b; 
+        --btn-bg: #e2e8f0; 
+      }
+      .dark { 
+        --bg: #0f172a; 
+        --card: #1e293b; 
+        --text: #f8fafc; 
+        --border: #334155; 
+        --input-bg: #0f172a; 
+        --input-text: #f8fafc; 
+        --btn-bg: #334155; 
+      }
+      body { 
+        background-color: var(--bg); 
+        color: var(--text); 
+        font-family: 'Inter', sans-serif; 
+        padding: 2rem 1rem; 
+        margin: 0; 
+        min-height: 100vh; 
+        display: flex; 
+        justify-content: center; 
+        transition: 0.3s; 
+      }
       
-      .custom-content-wrapper { position: relative; width: 75% !important; max-width: 1200px; padding: 2rem; border-radius: 1.5rem; background: var(--card); border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); display: flex; flex-direction: column; }
-      @media (max-width: 768px) { .custom-content-wrapper { width: 100% !important; padding: 1.25rem; } }
+      .custom-content-wrapper { 
+        position: relative; 
+        width: 75% !important; 
+        max-width: 1200px; 
+        padding: 2rem; 
+        border-radius: 1.5rem; 
+        background: var(--card); 
+        border: 1px solid var(--border); 
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); 
+        display: flex; 
+        flex-direction: column; 
+      }
+      @media (max-width: 768px) { 
+        .custom-content-wrapper { width: 100% !important; padding: 1.25rem; } 
+      }
       
-      .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-      .header-title { font-size: 1.875rem; font-weight: 900; color: #2563eb; letter-spacing: -0.05em; text-transform: uppercase; }
-      .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+      .header-row { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin-bottom: 2rem; 
+        flex-wrap: wrap; 
+        gap: 1rem; 
+      }
+      .header-title { 
+        font-size: 1.875rem; 
+        font-weight: 900; 
+        color: #2563eb; 
+        letter-spacing: -0.05em; 
+        text-transform: uppercase; 
+      }
+      .header-actions { 
+        display: flex; 
+        align-items: center; 
+        gap: 0.75rem; 
+      }
 
-      .action-icon-btn { width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; border-radius: 0.75rem; background: var(--btn-bg); border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; color: var(--text); }
+      .action-icon-btn { 
+        width: 2.5rem; 
+        height: 2.5rem; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        border-radius: 0.75rem; 
+        background: var(--btn-bg); 
+        border: 1px solid var(--border); 
+        cursor: pointer; 
+        transition: all 0.2s; 
+        color: var(--text); 
+      }
       .action-icon-btn:hover { opacity: 0.8; transform: translateY(-1px); }
       
-      input, select { background-color: var(--input-bg) !important; color: var(--input-text) !important; border: 1px solid var(--border) !important; }
-      #monaco-container { height: 50vh; border-radius: 0.75rem; border: 2px solid var(--border); overflow: hidden; margin: 1rem 0; }
+      input, select { 
+        background-color: var(--input-bg) !important; 
+        color: var(--input-text) !important; 
+        border: 1px solid var(--border) !important; 
+      }
+      #monaco-container { 
+        height: 50vh; 
+        border-radius: 0.75rem; 
+        border: 2px solid var(--border); 
+        overflow: hidden; 
+        margin: 1rem 0; 
+      }
       
-      .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.8rem 2rem; border-radius: 1rem; color: white; opacity: 0; transition: 0.3s; z-index: 2000; }
+      .toast { 
+        position: fixed; 
+        bottom: 2rem; 
+        left: 50%; 
+        transform: translateX(-50%); 
+        padding: 0.8rem 2rem; 
+        border-radius: 1rem; 
+        color: white; 
+        opacity: 0; 
+        transition: 0.3s; 
+        z-index: 2000; 
+      }
       .toast.show { opacity: 1; }
       
-      .mobile-action-btn { font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 0.5rem; margin-left: 0.5rem; color: white; font-weight: bold; transition: opacity 0.2s; }
+      .mobile-action-btn { 
+        font-size: 0.75rem; 
+        padding: 0.25rem 0.75rem; 
+        border-radius: 0.5rem; 
+        margin-left: 0.5rem; 
+        color: white; 
+        font-weight: bold; 
+        transition: opacity 0.2s; 
+      }
       .mobile-action-btn:active { transform: scale(0.95); }
 
-      .footer-signature { margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border); text-align: center; }
-      .footer-link { color: #2563eb; font-weight: 700; font-size: 0.9rem; text-decoration: none; }
+      .footer-signature { 
+        margin-top: 1.5rem; 
+        padding-top: 1.2rem; 
+        border-top: 1px solid var(--border); 
+        text-align: center; 
+      }
+      .footer-link { 
+        color: #2563eb; 
+        font-weight: 700; 
+        font-size: 0.9rem; 
+        text-decoration: none; 
+      }
       .footer-link:hover { text-decoration: underline; }
 
-      .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+      .modal-backdrop { 
+        position: fixed; 
+        inset: 0; 
+        background: rgba(0,0,0,0.6); 
+        z-index: 1000; 
+        display: none; 
+        align-items: center; 
+        justify-content: center; 
+        backdrop-filter: blur(4px); 
+      }
       .modal-backdrop.active { display: flex; }
       
       /* Token Modal */
-      .token-modal { background: var(--card); width: 90%; max-width: 800px; max-height: 90vh; border-radius: 1.5rem; padding: 2rem; overflow-y: auto; border: 1px solid var(--border); }
+      .token-modal { 
+        background: var(--card); 
+        width: 90%; 
+        max-width: 800px; 
+        max-height: 90vh; 
+        border-radius: 1.5rem; 
+        padding: 2rem; 
+        overflow-y: auto; 
+        border: 1px solid var(--border); 
+      }
       
-      .login-box { background: var(--card); width: 100%; max-width: 420px; padding: 2.5rem; border-radius: 2rem; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); text-align: center; }
-      .tab-btn { padding: 0.75rem; flex: 1; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 600; cursor: pointer; transition: 0.2s; }
+      .login-box { 
+        background: var(--card); 
+        width: 100%; 
+        max-width: 420px; 
+        padding: 2.5rem; 
+        border-radius: 2rem; 
+        border: 1px solid var(--border); 
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); 
+        text-align: center; 
+      }
+      .tab-btn { 
+        padding: 0.75rem; 
+        flex: 1; 
+        border-bottom: 2px solid transparent; 
+        color: #94a3b8; 
+        font-weight: 600; 
+        cursor: pointer; 
+        transition: 0.2s; 
+      }
       .tab-btn.active { color: #2563eb; border-color: #2563eb; }
       
-      .delete-box { background: var(--card); width: 100%; max-width: 360px; padding: 2rem; border-radius: 1.5rem; border: 1px solid var(--border); text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+      .delete-box { 
+        background: var(--card); 
+        width: 100%; 
+        max-width: 360px; 
+        padding: 2rem; 
+        border-radius: 1.5rem; 
+        border: 1px solid var(--border); 
+        text-align: center; 
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); 
+      }
 
-      .token-card { background: var(--input-bg); border: 1px solid var(--border); border-radius: 1rem; padding: 1rem; margin-bottom: 1rem; position: relative; }
-      .token-val { font-family: monospace; word-break: break-all; font-weight: bold; color: #0ea5e9; }
-      .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+      .token-card { 
+        background: var(--input-bg); 
+        border: 1px solid var(--border); 
+        border-radius: 1rem; 
+        padding: 1rem; 
+        margin-bottom: 1rem; 
+        position: relative; 
+      }
+      .token-val { 
+        font-family: monospace; 
+        word-break: break-all; 
+        font-weight: bold; 
+        color: #0ea5e9; 
+      }
+      .badge { 
+        display: inline-block; 
+        padding: 0.2rem 0.6rem; 
+        border-radius: 999px; 
+        font-size: 0.75rem; 
+        font-weight: 700; 
+      }
       .badge-green { background: #dcfce7; color: #166534; }
       .badge-red { background: #fee2e2; color: #991b1b; }
       .dark .badge-green { background: #064e3b; color: #a7f3d0; }
       .dark .badge-red { background: #7f1d1d; color: #fecaca; }
-      .delete-btn { position: absolute; top: 1rem; right: 1rem; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 6px; transition: 0.2s; }
+      .delete-btn { 
+        position: absolute; 
+        top: 1rem; 
+        right: 1rem; 
+        color: #ef4444; 
+        cursor: pointer; 
+        padding: 4px; 
+        border-radius: 6px; 
+        transition: 0.2s; 
+      }
       .delete-btn:hover { background: #fee2e2; }
       .dark .delete-btn:hover { background: #450a0a; }
 
     </style>
   </head>
   <body class="light">
-  
+   
     <div id="login-gateway" class="fixed inset-0 bg-slate-100 dark:bg-slate-900 z-[5000] flex items-center justify-center p-4">
        <div class="login-box">
           <h1 class="text-3xl font-black mb-6 text-blue-600 tracking-tighter uppercase">WORKERS PRO IDE</h1>
@@ -398,14 +578,25 @@ function renderUI() {
                document.body.classList.add('dark');
                $('theme-icon').innerText = '🌙';
             }
+            
+            // [修复] 内存泄漏优化配置
             editor = monaco.editor.create($('monaco-container'), {
                value: '// 请先登录并刷新列表...',
                language: 'javascript',
-               automaticLayout: true,
+               automaticLayout: false, // 1. 关闭自动轮询
                minimap: { enabled: false },
                fontSize: 14,
                theme: document.body.classList.contains('dark') ? 'vs-dark' : 'vs'
             });
+
+            // 2. 使用原生 ResizeObserver 监听容器变化，代替轮询
+            const resizeObserver = new ResizeObserver(() => {
+                editor.layout();
+            });
+            resizeObserver.observe($('monaco-container'));
+            
+            // 3. 同时监听窗口大小变化
+            window.addEventListener('resize', () => editor.layout());
          });
 
          const path = window.location.pathname;
@@ -545,7 +736,11 @@ function renderUI() {
               $('script-select').innerHTML = res.result.map(s => \`<option value="\${s.id}">\${s.id}</option>\`).join('');
               showToast("列表更新成功");
             } else if(action === 'fetch') {
-              editor.setValue(res.code);
+              // [优化] 更新代码并清空撤销栈，防止内存积压
+              const model = editor.getModel();
+              model.setValue(res.code);
+              editor.pushUndoStop(); // 清空历史
+              
               showToast("拉取成功");
             } else if(action === 'deploy') {
               showToast("🎉 部署成功！");
@@ -677,8 +872,8 @@ function renderUI() {
       function editorSelectAll() { editor?.focus(); editor?.setSelection(editor.getModel().getFullModelRange()); showToast("已全选"); }
       function editorCopyAll() { 
           navigator.clipboard.writeText(editor.getValue())
-             .then(() => showToast("已复制"))
-             .catch(() => { editorSelectAll(); showToast("请手动复制", true); });
+              .then(() => showToast("已复制"))
+              .catch(() => { editorSelectAll(); showToast("请手动复制", true); });
       }
       async function editorPaste() {
         editor?.focus();
