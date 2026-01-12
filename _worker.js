@@ -254,20 +254,47 @@ export default {
           }
         };
 
+        // --- 登录错误信息“人类可读”映射 ---
+        const normalizeLoginError = (data) => {
+          const firstErr = data?.errors?.[0];
+          const msg = (firstErr?.message || "").toString();
+          const code = firstErr?.code;
+
+          if (
+            /Could not route to/i.test(msg) ||
+            /object identifier is invalid/i.test(msg) ||
+            /\/accounts\/[^/]+\/workers\/scripts/i.test(msg)
+          ) {
+            return "Account ID 或 API 填写错误，无法登录";
+          }
+
+          if (
+            code === 9109 ||
+            /authentication/i.test(msg) ||
+            /invalid.*token/i.test(msg) ||
+            /permission/i.test(msg) ||
+            /forbidden/i.test(msg)
+          ) {
+            return "API Token 无效或权限不足，请检查 Token 是否有 Workers 相关权限";
+          }
+
+          return msg || "验证失败: API 拒绝访问";
+        };
+
         if (action === 'verifyLogin') {
           // 尝试获取一个资源列表来验证凭证有效性
           const res = await safeFetch(`${baseUrl}/workers/scripts?per_page=1`, {
             headers: authHeader
           });
-          
+
           if (res.ok) {
             return jsonRes({ success: true, role: isRootAdmin ? 'root' : 'token' });
           } else {
-            // 将 Cloudflare 的具体错误透传给前端
-            const errorMsg = res.data.errors && res.data.errors.length > 0 ? res.data.errors[0].message : "验证失败: API 拒绝访问";
+            const errorMsg = normalizeLoginError(res.data);
             return jsonRes({ success: false, errors: [{ message: errorMsg }] });
           }
         }
+
 
         // 资源列表查询
         if (action === "listResources") {
@@ -1247,7 +1274,7 @@ function renderUI() {
       function confirmRemoveBinding(index) { bindingToRemoveIndex = index; $('remove-binding-modal').classList.add('active'); }
       function executeRemoveBinding() { if(bindingToRemoveIndex !== null) currentBindings.splice(bindingToRemoveIndex, 1); renderBindings(); closeModal('remove-binding-modal'); }
       function openDeployModal() { if(!$('script-select').value) return showToast("请先选择脚本", true); $('deploy-modal').classList.add('active'); }
-      async function executeDeploy() { closeModal('deploy-modal'); const btn = $('p-btn'); btn.disabled = true; btn.innerText = "⌛ 中..."; await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(currentBindings) }); btn.disabled = false; btn.innerText = "🚀 同步部署"; }
+      async function executeDeploy() { closeModal('deploy-modal'); const btn = $('p-btn'); btn.disabled = true; btn.innerText = "⌛ 正在部署..."; await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(currentBindings) }); btn.disabled = false; btn.innerText = "🚀 同步部署"; }
       
       function confirmAddBinding() {
          let newBind = {};
