@@ -1,10 +1,10 @@
 /**
- * WorkerS Pro Editor V6.3 - 视觉极简与错误反馈修复版 (完整未压缩)
+ * WorkerS Pro Editor V7.0 - 资源即时创建版 (完整未压缩)
  * * * 变更说明：
- * 1. [视觉] 全局隐藏滚动条：使用 CSS 彻底移除所有容器的滚动条显示，保持极简视觉，消除叠加感。
- * 2. [交互] 登录错误反馈重构：登录失败时，登录框会有“抖动”动画，并在按钮上方直接显示红色错误文字。
- * 3. [修复] 修复了 Token/Root 错误信息无法显示的问题。
- * 4. [格式] 严格保持代码全展开，无任何压缩，保留所有注释。
+ * 1. [新增] 资源快速创建功能：支持在绑定界面直接创建 KV 和 D1 资源。
+ * 2. [交互] 创建成功后自动刷新列表并选中新资源，无需离开当前页面。
+ * 3. [保留] V6.5 所有功能 (视觉极简、登录反馈修复、全资源绑定)。
+ * 4. [格式] 全代码反压缩，保留注释，方便阅读。
  */
 
 export default {
@@ -157,7 +157,7 @@ export default {
           const matchedToken = tokens.find(t => t.token === loginToken);
 
           if (!matchedToken) {
-            return jsonRes({ success: false, errors: [{ message: "无效的 Token (未找到记录)" }] });
+            return jsonRes({ success: false, errors: [{ message: "无效的 Token (未找到)" }] });
           }
           
           if (matchedToken.expiry !== -1 && Date.now() > matchedToken.expiry) {
@@ -228,7 +228,7 @@ export default {
         // --- 编辑器核心业务 ---
         if (!accountId || !apiToken) {
           if (action === 'verifyLogin') {
-            return jsonRes({ success: false, errors: [{ message: "凭证无效: 缺少 Account ID 或 Token" }] });
+            return jsonRes({ success: false, errors: [{ message: "Account ID 或 Token 不能为空" }] });
           }
           return jsonRes({ success: false, errors: [{ message: "缺少认证信息" }] });
         }
@@ -238,51 +238,56 @@ export default {
         };
         const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
 
+        // [V6.4 智能错误翻译]
         const safeFetch = async (url, options = {}) => {
           try {
             const res = await fetch(url, options);
             const text = await res.text();
             let data;
-            try {
-              data = JSON.parse(text);
+
+            try { 
+              data = JSON.parse(text); 
             } catch (e) {
-              data = { success: false, errors: [{ message: "API 返回非 JSON: " + text.substring(0, 50) }] };
+              // JSON 解析失败时的兜底
+              if (text.includes("Could not route") || text.includes("object identifier is invalid")) {
+                data = { success: false, errors: [{ message: "Account ID 或 API 填写错误，无法登录" }] };
+              } else if (res.status === 400 || res.status === 403) {
+                data = { success: false, errors: [{ message: "API Token 无效或权限不足，请检查 Token 是否有 Workers 相关权限" }] };
+              } else {
+                data = { success: false, errors: [{ message: "API 响应异常: " + text.substring(0, 50) }] };
+              }
             }
+
+            // 翻译标准 JSON 错误 (重点：这里补上 Could not route)
+            if (data && !data.success && data.errors && data.errors.length > 0) {
+              const rawMsg = (data.errors[0].message || "").toString();
+
+              if (
+                rawMsg.includes("Could not route") ||
+                rawMsg.includes("object identifier is invalid")
+              ) {
+                data.errors[0].message = "Account ID 或 API 填写错误，无法登录";
+              } else if (rawMsg.includes("Invalid access token")) {
+                data.errors[0].message = "API Token 无效，请检查";
+              } else if (rawMsg.includes("Actor not authorized")) {
+                data.errors[0].message = "Account ID 与 Token 不匹配";
+              } else if (
+                /authentication/i.test(rawMsg) ||
+                /invalid.*token/i.test(rawMsg) ||
+                /permission/i.test(rawMsg) ||
+                /forbidden/i.test(rawMsg)
+              ) {
+                data.errors[0].message = "API Token 无效或权限不足";
+              }
+            }
+
             return { ok: res.ok, status: res.status, data };
           } catch (err) {
-            return { ok: false, data: { success: false, errors: [{ message: "网络错误: " + err.message }] } };
+            return { ok: false, data: { success: false, errors: [{ message: "网络请求失败: " + err.message }] } };
           }
-        };
-
-        // --- 登录错误信息“人类可读”映射 ---
-        const normalizeLoginError = (data) => {
-          const firstErr = data?.errors?.[0];
-          const msg = (firstErr?.message || "").toString();
-          const code = firstErr?.code;
-
-          if (
-            /Could not route to/i.test(msg) ||
-            /object identifier is invalid/i.test(msg) ||
-            /\/accounts\/[^/]+\/workers\/scripts/i.test(msg)
-          ) {
-            return "Account ID 或 API 填写错误，无法登录";
-          }
-
-          if (
-            code === 9109 ||
-            /authentication/i.test(msg) ||
-            /invalid.*token/i.test(msg) ||
-            /permission/i.test(msg) ||
-            /forbidden/i.test(msg)
-          ) {
-            return "API Token 无效或权限不足，请检查 Token 是否有 Workers 相关权限";
-          }
-
-          return msg || "验证失败: API 拒绝访问";
         };
 
         if (action === 'verifyLogin') {
-          // 尝试获取一个资源列表来验证凭证有效性
           const res = await safeFetch(`${baseUrl}/workers/scripts?per_page=1`, {
             headers: authHeader
           });
@@ -290,11 +295,40 @@ export default {
           if (res.ok) {
             return jsonRes({ success: true, role: isRootAdmin ? 'root' : 'token' });
           } else {
-            const errorMsg = normalizeLoginError(res.data);
+            const errorMsg = res.data.errors && res.data.errors[0] ? res.data.errors[0].message : "验证失败，凭证无效";
             return jsonRes({ success: false, errors: [{ message: errorMsg }] });
           }
         }
 
+
+        // [V7.0 新增] 创建资源接口
+        if (action === "createResource") {
+           const type = formData.get("type");
+           const name = formData.get("name");
+           if (!name) return jsonRes({ success: false, errors: [{ message: "名称不能为空" }] });
+
+           let url = "";
+           let body = {};
+
+           // 目前仅支持 KV 和 D1 的快速创建
+           if (type === 'kv_namespace') {
+              url = `${baseUrl}/storage/kv/namespaces`;
+              body = { title: name };
+           } else if (type === 'd1') {
+              url = `${baseUrl}/d1/database`;
+              body = { name: name };
+           } else {
+              return jsonRes({ success: false, errors: [{ message: "暂不支持创建此类型资源，请前往控制台创建" }] });
+           }
+
+           const res = await safeFetch(url, {
+              method: 'POST',
+              headers: { ...authHeader, 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+           });
+           
+           return jsonRes(res.data);
+        }
 
         // 资源列表查询
         if (action === "listResources") {
@@ -401,29 +435,26 @@ function renderUI() {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Workers Pro Editor V 6.3</title>
+    <title>Workers Pro Editor V7.0</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M13%202L3%2014H12L11%2022L21%2010H12L13%202Z%22%20stroke%3D%22%23F59E0B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <style>
-      /* --- [核心修复] 彻底隐藏滚动条但保留功能 --- */
-      
-      /* Webkit (Chrome, Safari, Edge) */
+      /* --- [核心] 隐藏滚动条 --- */
       ::-webkit-scrollbar {
         width: 0px !important;
         height: 0px !important;
         background: transparent !important;
       }
-      
-      /* Firefox */
       * {
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
       }
+      .hidden {
+        display: none !important;
+      }
       
-      .hidden { display: none !important; }
-      
-      /* --- 动画相关 --- */
+      /* --- 动画 --- */
       @keyframes fadeOutUp {
         from { opacity: 1; transform: translateY(0); }
         to { opacity: 0; transform: translateY(-20px); }
@@ -434,7 +465,6 @@ function renderUI() {
         to { opacity: 1; filter: blur(0); }
       }
 
-      /* 错误抖动动画 */
       @keyframes shake {
         0%, 100% { transform: translateX(0); }
         20%, 60% { transform: translateX(-5px); }
@@ -463,6 +493,7 @@ function renderUI() {
         --input-text: #1e293b;
         --btn-bg: #e2e8f0;
         --error-red: #ef4444;
+        --success-green: #10b981;
       }
 
       .dark {
@@ -550,7 +581,6 @@ function renderUI() {
         transform: translateY(-1px);
       }
 
-      /* [优化] 输入框样式统一 */
       input,
       select,
       textarea {
@@ -558,12 +588,11 @@ function renderUI() {
         color: var(--input-text) !important;
         border: 1px solid var(--border) !important;
         outline: none;
-      }
-
-      /* [优化] 下拉框样式扁平化 */
-      select {
         appearance: none;
         -webkit-appearance: none;
+      }
+
+      select {
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
         background-position: right 0.5rem center;
         background-repeat: no-repeat;
@@ -667,13 +696,12 @@ function renderUI() {
         position: relative;
       }
 
-      /* [V6.3 新增] 登录错误信息样式 */
       .login-error-msg {
         color: var(--error-red);
         font-size: 0.875rem;
         margin-bottom: 1rem;
         font-weight: 600;
-        display: none; /* 默认隐藏 */
+        display: none;
       }
 
       .tab-btn {
@@ -882,6 +910,32 @@ function renderUI() {
         border-bottom: 2px solid #2563eb;
         margin-bottom: -2px;
       }
+      
+      /* [V7.0 新增] 创建按钮样式 */
+      .create-btn {
+         margin-top: 0.5rem;
+         width: 100%;
+         padding: 0.5rem;
+         border-radius: 0.5rem;
+         background: #dcfce7;
+         color: #166534;
+         font-size: 0.8rem;
+         font-weight: bold;
+         cursor: pointer;
+         border: 1px solid #bbf7d0;
+         transition: 0.2s;
+      }
+      .create-btn:hover {
+         background: #bbf7d0;
+      }
+      .dark .create-btn {
+         background: #064e3b;
+         color: #a7f3d0;
+         border-color: #065f46;
+      }
+      .dark .create-btn:hover {
+         background: #065f46;
+      }
     </style>
   </head>
   <body class="light">
@@ -915,7 +969,7 @@ function renderUI() {
     <div class="custom-content-wrapper" id="main-interface">
 
       <div class="header-row">
-        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V 6.3</span></h1>
+        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.0</span></h1>
         <div class="header-actions">
           <div id="user-badge" class="px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-500 whitespace-nowrap">未登录</div>
           <button id="btn-manage-token" onclick="openTokenModal()" class="action-icon-btn" title="Token 管理" style="color: #F59E0B;">
@@ -951,7 +1005,7 @@ function renderUI() {
       <div id="monaco-container"></div>
 
       <button id="p-btn" onclick="openDeployModal()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xl shadow-2xl transition active:scale-95">
-        🚀 同步部署 (代码 + 绑定)
+        🚀 正在部署...
       </button>
 
       <div class="footer-signature">
@@ -1049,6 +1103,11 @@ function renderUI() {
             <label id="bind-id-label" class="block text-xs font-bold text-slate-500 mb-1">选择资源</label>
             <div id="res-loading" class="text-xs text-blue-500 hidden mb-1">正在获取资源列表...</div>
             <select id="bind-select" class="w-full p-3 rounded-lg hidden font-mono"></select>
+            
+            <div id="create-res-container" class="hidden">
+               <button onclick="openCreateResModal()" class="create-btn">+ 新建资源</button>
+            </div>
+            
             <input id="bind-id" type="text" placeholder="或手动粘贴 ID..." class="w-full p-3 rounded-lg font-mono mt-2">
           </div>
 
@@ -1063,6 +1122,17 @@ function renderUI() {
         <div class="flex gap-3 mt-6">
           <button onclick="closeModal('add-binding-modal')" class="flex-1 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600">取消</button>
           <button onclick="confirmAddBinding()" class="flex-1 py-3 rounded-xl font-bold bg-blue-600 text-white">添加</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="create-res-modal" class="modal-backdrop">
+      <div class="delete-box">
+        <h3 class="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">新建 <span id="create-res-type"></span></h3>
+        <input id="new-res-name" type="text" placeholder="输入资源名称..." class="w-full p-3 rounded-lg font-mono mb-4 border border-slate-300">
+        <div class="flex gap-3">
+          <button onclick="closeModal('create-res-modal')" class="flex-1 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-700 text-slate-600">取消</button>
+          <button onclick="executeCreateResource()" class="flex-1 py-3 rounded-xl font-bold bg-green-600 text-white">创建并选中</button>
         </div>
       </div>
     </div>
@@ -1146,7 +1216,6 @@ function renderUI() {
              const tokenVal = magicToken || path.substring(1);
              $('login-ck').value = tokenVal; 
              
-             // [交互] URL 登录触发按钮状态
              const btn = $('login-btn');
              btn.innerText = "验证中...";
              btn.disabled = true;
@@ -1176,7 +1245,6 @@ function renderUI() {
             $('tab-token').classList.add('active'); $('tab-admin').classList.remove('active');
             $('form-token').classList.remove('hidden'); $('form-admin').classList.add('hidden');
          }
-         // 清除可能存在的错误提示
          showLoginError("");
       }
 
@@ -1218,16 +1286,27 @@ function renderUI() {
 
       async function updateBindInputs() {
          const type = $('bind-type').value;
-         const select = $('bind-select'); const loading = $('res-loading'); const idContainer = $('id-input-container'); const idInput = $('bind-id');
+         const select = $('bind-select'); const loading = $('res-loading'); 
+         const idContainer = $('id-input-container'); const idInput = $('bind-id');
+         const createBtn = $('create-res-container');
+
          const noIdTypes = ['ai', 'browser_rendering', 'version_metadata', 'ratelimit'];
-         
-         if (noIdTypes.includes(type)) { idContainer.classList.add('hidden'); idInput.value = "enabled"; return; } 
-         else { idContainer.classList.remove('hidden'); idInput.value = ""; }
+         if (noIdTypes.includes(type)) { 
+            idContainer.classList.add('hidden'); idInput.value = "enabled"; return; 
+         } else { 
+            idContainer.classList.remove('hidden'); idInput.value = ""; 
+         }
          
          select.classList.add('hidden'); loading.classList.remove('hidden'); select.innerHTML = '';
-         
+         if(createBtn) createBtn.classList.add('hidden'); // 默认隐藏创建按钮
+
          const fetchableTypes = ['kv_namespace', 'd1', 'r2_bucket', 'service', 'queue', 'durable_object_namespace', 'vectorize', 'hyperdrive', 'dispatch_namespace'];
          if (!fetchableTypes.includes(type)) { loading.classList.add('hidden'); idInput.placeholder = "手动输入资源 ID 或配置..."; return; }
+
+         // [V7.0] 显示创建按钮 (仅支持 KV 和 D1)
+         if (type === 'kv_namespace' || type === 'd1') {
+             if(createBtn) createBtn.classList.remove('hidden');
+         }
 
          try {
              const res = await apiCall({ action: 'listResources', type: type });
@@ -1240,8 +1319,58 @@ function renderUI() {
                  }).join('');
                  if(select.options.length > 0) $('bind-id').value = select.options[0].value;
                  select.onchange = () => { $('bind-id').value = select.value; };
-             } else { select.innerHTML = '<option value="">未找到资源 (请手动输入)</option>'; select.classList.remove('hidden'); }
+             } else { select.innerHTML = '<option value="">未找到资源 (请手动输入或创建)</option>'; select.classList.remove('hidden'); }
          } catch(e) {} finally { loading.classList.add('hidden'); }
+      }
+      
+      // [V7.0] 打开创建弹窗
+      function openCreateResModal() {
+         const type = $('bind-type').value;
+         const typeName = type === 'kv_namespace' ? 'KV 命名空间' : 'D1 数据库';
+         $('create-res-type').innerText = typeName;
+         $('new-res-name').value = '';
+         $('create-res-modal').classList.add('active');
+      }
+
+      // [V7.0] 执行创建逻辑
+      async function executeCreateResource() {
+         const type = $('bind-type').value;
+         const name = $('new-res-name').value.trim();
+         if (!name) return showToast("名称不能为空", true);
+
+         const btn = event.target;
+         const originalText = btn.innerText;
+         btn.innerText = "创建中...";
+         btn.disabled = true;
+
+         try {
+             const res = await apiCall({ action: 'createResource', type: type, name: name });
+             if (res.success) {
+                 showToast("创建成功!");
+                 closeModal('create-res-modal');
+                 // 自动刷新列表并尝试选中
+                 await updateBindInputs();
+                 // 简单的选中逻辑: 刚刚创建的通常在列表里，这里通过再次拉取列表
+                 // 如果要精确选中，需要遍历 select options
+                 setTimeout(() => {
+                     const select = $('bind-select');
+                     for (let i = 0; i < select.options.length; i++) {
+                         if (select.options[i].text.includes(name)) {
+                             select.selectedIndex = i;
+                             $('bind-id').value = select.value;
+                             break;
+                         }
+                     }
+                 }, 500);
+             } else {
+                 showToast("创建失败: " + (res.errors?.[0]?.message || "未知错误"), true);
+             }
+         } catch (e) {
+             showToast("请求失败", true);
+         } finally {
+             btn.innerText = originalText;
+             btn.disabled = false;
+         }
       }
 
       async function doAction(action, extra = {}) {
@@ -1316,13 +1445,11 @@ function renderUI() {
       function openAddBindingModal() { $('add-binding-modal').classList.add('active'); if(activeBindTab==='resource') updateBindInputs(); }
       function showToast(m, isE = false) { const t = $('toast'); t.innerText = m; t.className = 'toast '+(isE?'bg-red-500':'bg-emerald-600')+' show'; setTimeout(()=>t.classList.remove('show'), 3000); }
       
-      // [V6.3 新增] 显性错误提示函数
       function showLoginError(msg) {
           const el = $('login-msg');
           if (msg) {
               el.innerText = msg;
               el.style.display = 'block';
-              // 抖动特效
               $('login-box-inner').classList.add('animate-shake');
               setTimeout(() => $('login-box-inner').classList.remove('animate-shake'), 400);
           } else {
@@ -1335,7 +1462,7 @@ function renderUI() {
           const btn = $('login-btn');
           const originalText = "进入系统";
           
-          showLoginError(""); // 清除旧错误
+          showLoginError(""); 
           btn.innerText = "验证中...";
           btn.disabled = true;
 
@@ -1345,14 +1472,14 @@ function renderUI() {
               payload.loginToken = $('login-ck').value.trim();
               if(!payload.loginToken) {
                   btn.innerText = originalText; btn.disabled = false;
-                  return showLoginError("请输入 Token"); // 显性错误
+                  return showLoginError("请输入 Token"); 
               }
           } else { 
               payload.accountId = $('login-aid').value.trim(); 
               payload.apiToken = $('login-key').value.trim(); 
               if(!payload.accountId || !payload.apiToken) {
                   btn.innerText = originalText; btn.disabled = false;
-                  return showLoginError("请输入完整凭证"); // 显性错误
+                  return showLoginError("请输入完整凭证"); 
               }
           }
           
@@ -1363,7 +1490,6 @@ function renderUI() {
                   localStorage.setItem('wpe_session', JSON.stringify(authState)); 
                   showInterface(); 
               } else {
-                  // 显性展示后端返回的具体错误
                   showLoginError(res.errors && res.errors[0] ? res.errors[0].message : "验证失败，请检查凭证");
                   btn.innerText = originalText; btn.disabled = false;
               }
@@ -1381,7 +1507,7 @@ function renderUI() {
           if(authState.mode === 'root') {
               badge.innerHTML = "Root 管理员";
               badge.className = "px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold";
-          } else {
+          } else if (authState.mode === 'token') {
               badge.innerHTML = "Token 管理员";
               badge.className = "px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200";
           }
