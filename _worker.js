@@ -1,11 +1,13 @@
 /**
- * WorkerS Pro Editor V7.5 - UI 细节修复版
+ * WorkerS Pro Editor V7.6 - D1 独立运行修复版
  * * * * 历史版本锁定说明 * *
- * [基础架构]: 基于 V7.4 (自动解析名称版)。
- * * * * V7.5 变更说明 * *
- * 1. [UI修复] 修复了绑定卡片中"删除按钮(×)"与"资源类型徽章"重叠的问题。
- * - 通过增加 header 的右侧内边距 (padding-right)，强制留出安全距离。
- * 2. [继承] 保留了 V7.4 的所有核心功能：ID转名称自动解析、资源绑定、代码拉取/部署等。
+ * [基础架构]: 基于 V7.5 (UI 细节修复版)。
+ * * * * V7.6 变更说明 * *
+ * 1. [核心修复] 修复了"未绑定 KV_STORAGE"报错问题。
+ * - 旧逻辑：Token 登录强制检查 KV_STORAGE。
+ * - 新逻辑：只要检测到 DB (D1) 或 KV_STORAGE 任意一个存在，即可正常运行。
+ * 2. [兼容] 完美支持仅绑定 D1 数据库的场景，无需再额外部署 KV。
+ * 3. [继承] 保留了之前所有的名称自动解析、UI 优化等功能。
  */
 
 export default {
@@ -152,7 +154,10 @@ export default {
         let isTokenUser = false;
 
         if (loginToken) {
-          if (!env.KV_STORAGE) return jsonRes({ success: false, errors: [{ message: "未绑定 KV_STORAGE" }] });
+          // [V7.6 核心修复] 允许 DB 或 KV_STORAGE 任意一个存在
+          if (!env.KV_STORAGE && !env.DB) {
+             return jsonRes({ success: false, errors: [{ message: "未绑定存储资源 (需绑定 KV_STORAGE 或 DB)" }] });
+          }
 
           const tokens = await getAllTokens();
           const matchedToken = tokens.find(t => t.token === loginToken);
@@ -436,7 +441,7 @@ function renderUI() {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Workers Pro Editor V7.5</title>
+    <title>Workers Pro Editor V7.6</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M13%202L3%2014H12L11%2022L21%2010H12L13%202Z%22%20stroke%3D%22%23F59E0B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
@@ -1013,7 +1018,7 @@ function renderUI() {
     <div class="custom-content-wrapper" id="main-interface">
 
       <div class="header-row">
-        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.5</span></h1>
+        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.6</span></h1>
         <div class="header-actions">
           <div id="user-badge" class="px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-500 whitespace-nowrap">未登录</div>
           <button id="btn-manage-token" onclick="openTokenModal()" class="action-icon-btn" title="Token 管理" style="color: #F59E0B;">
