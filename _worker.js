@@ -1,14 +1,11 @@
 /**
- * WorkerS Pro Editor V7.1 - 精简版 (去除域名管理)
- * * * * 历史版本锁定说明 (V6.2) * *
- * [版本锁定]: 此版本核心逻辑锚定于 V6.2 稳定版架构。
- * [主要特性]: 1. 修复了登录状态下的 Session 保持问题。
- * 2. 优化了 KV/D1 双存储模式的读写延迟。
- * 3. 增加了对旧版 API Token 的兼容性检查。
- * * * * V7.1 变更说明 * *
- * 1. [移除] 移除了域名管理 (Custom Domains) 相关的所有功能。
- * 2. [视觉] 资源绑定徽章保持优化状态。
- * 3. [修复] 修正了 UI 字符串转义导致的 SyntaxError。
+ * WorkerS Pro Editor V7.5 - UI 细节修复版
+ * * * * 历史版本锁定说明 * *
+ * [基础架构]: 基于 V7.4 (自动解析名称版)。
+ * * * * V7.5 变更说明 * *
+ * 1. [UI修复] 修复了绑定卡片中"删除按钮(×)"与"资源类型徽章"重叠的问题。
+ * - 通过增加 header 的右侧内边距 (padding-right)，强制留出安全距离。
+ * 2. [继承] 保留了 V7.4 的所有核心功能：ID转名称自动解析、资源绑定、代码拉取/部署等。
  */
 
 export default {
@@ -433,16 +430,13 @@ export default {
 };
 
 function renderUI() {
-  // [重要]: 整个 HTML 是一个大的 Template Literal 字符串。
-  // 内部 JS 所有的反引号 ` 必须转义为 \`
-  // 内部 JS 所有的变量 ${} 必须转义为 \${}
   return `
   <!DOCTYPE html>
   <html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Workers Pro Editor V7.1 Lite</title>
+    <title>Workers Pro Editor V7.5</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M13%202L3%2014H12L11%2022L21%2010H12L13%202Z%22%20stroke%3D%22%23F59E0B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
@@ -788,26 +782,6 @@ function renderUI() {
         font-weight: 700;
       }
 
-      .badge-green {
-        background: #dcfce7;
-        color: #166534;
-      }
-
-      .badge-red {
-        background: #fee2e2;
-        color: #991b1b;
-      }
-
-      .dark .badge-green {
-        background: #064e3b;
-        color: #a7f3d0;
-      }
-
-      .dark .badge-red {
-        background: #7f1d1d;
-        color: #fecaca;
-      }
-
       .delete-btn {
         position: absolute;
         top: 1rem;
@@ -821,39 +795,6 @@ function renderUI() {
 
       .delete-btn:hover {
         background: #fee2e2;
-      }
-
-      /* [V7.1 优化] 绑定 Tag 样式增强 */
-      .binding-tag {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.35rem 0.75rem;
-        border-radius: 0.75rem;
-        font-size: 0.8rem;
-        font-weight: bold;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        border: 1px solid currentColor;
-        background-opacity: 0.2;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-      }
-
-      .binding-tag:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      }
-
-      .binding-del {
-        margin-left: 0.6rem;
-        cursor: pointer;
-        opacity: 0.6;
-        font-size: 1.1em;
-        line-height: 1;
-      }
-
-      .binding-del:hover {
-        opacity: 1;
-        color: #ef4444;
       }
 
       .add-binding-btn {
@@ -892,13 +833,105 @@ function renderUI() {
 
       .binding-row {
         display: flex;
-        align-items: center;
-        flex-wrap: wrap;
+        flex-direction: column; 
+        gap: 0.5rem;
         background: var(--input-bg);
         border: 1px solid var(--border);
         border-radius: 0.75rem;
+        padding: 0.75rem;
+        min-height: 4rem;
+      }
+
+      /* [V7.2 新增] 详细绑定卡片样式 */
+      .binding-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+        transition: all 0.2s;
+        border-left-width: 4px; /* 色条 */
+      }
+      
+      .binding-card:hover {
+        transform: translateX(2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      .binding-card.type-resource { border-left-color: #3b82f6; }
+      .binding-card.type-var { border-left-color: #a855f7; }
+      .binding-card.type-secret { border-left-color: #f97316; }
+
+      .binding-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        /* [V7.5 修复] 增加右侧内边距，防止徽章与绝对定位的删除按钮重叠 */
+        padding-right: 2.5rem;
+      }
+
+      .binding-name {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text);
+      }
+
+      .binding-type-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--bg);
+        color: #64748b;
+        font-weight: 600;
+        border: 1px solid var(--border);
+        /* 防止文本过长时不换行导致布局混乱 */
+        white-space: nowrap; 
+      }
+
+      .binding-details {
+        font-size: 0.8rem;
+        color: #64748b;
+        word-break: break-all;
+        background: var(--bg);
         padding: 0.5rem;
-        min-height: 3rem;
+        border-radius: 0.5rem;
+      }
+
+      .detail-row {
+        display: flex;
+        margin-bottom: 2px;
+      }
+      .detail-label {
+        font-weight: bold;
+        margin-right: 6px;
+        min-width: 60px;
+        color: #475569;
+      }
+      .dark .detail-label { color: #94a3b8; }
+
+      .card-del-btn {
+        position: absolute;
+        top: 0.75rem; /* 与卡片 padding 对齐 */
+        right: 0.5rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ef4444;
+        cursor: pointer;
+        border-radius: 4px;
+        opacity: 0.6;
+        transition: 0.2s;
+      }
+      .card-del-btn:hover {
+        background: #fee2e2;
+        opacity: 1;
       }
 
       .modal-tabs {
@@ -923,7 +956,6 @@ function renderUI() {
         margin-bottom: -2px;
       }
       
-      /* [V7.0 新增] 创建按钮样式 */
       .create-btn {
           margin-top: 0.5rem;
           width: 100%;
@@ -981,7 +1013,7 @@ function renderUI() {
     <div class="custom-content-wrapper" id="main-interface">
 
       <div class="header-row">
-        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.1</span></h1>
+        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.5</span></h1>
         <div class="header-actions">
           <div id="user-badge" class="px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-500 whitespace-nowrap">未登录</div>
           <button id="btn-manage-token" onclick="openTokenModal()" class="action-icon-btn" title="Token 管理" style="color: #F59E0B;">
@@ -1009,8 +1041,11 @@ function renderUI() {
           <button onclick="editorPaste()" class="mobile-action-btn bg-green-500">粘贴</button>
         </div>
         <div class="binding-row">
-          <div id="binding-container" class="flex flex-wrap items-center flex-1"></div>
-          <div onclick="openAddBindingModal()" class="add-binding-btn ml-2 flex-shrink-0" title="添加新绑定">+</div>
+            <div class="flex justify-between items-center mb-2">
+               <span class="text-xs font-bold text-slate-500 uppercase">环境变量与资源绑定</span>
+               <div onclick="openAddBindingModal()" class="add-binding-btn" title="添加新绑定">+</div>
+            </div>
+            <div id="binding-container" class="flex flex-col w-full"></div>
         </div>
       </div>
 
@@ -1200,6 +1235,8 @@ function renderUI() {
       let currentBindings = [];
       let bindingToRemoveIndex = null;
       let activeBindTab = 'resource';
+      // [V7.4] 全局资源名称缓存 Map { 'id': 'name' }
+      let resourceMap = {};
 
       function init() {
          checkUrlAndLogin(); 
@@ -1296,6 +1333,40 @@ function renderUI() {
          return await response.json();
       }
 
+      // [V7.4] 核心逻辑：自动反查资源名称
+      async function autoResolveResourceNames() {
+          if (!currentBindings || currentBindings.length === 0) return;
+          
+          const typesToFetch = new Set();
+          currentBindings.forEach(b => {
+              if (b.type === 'd1' || b.type === 'kv_namespace' || b.type === 'r2_bucket' || b.type === 'service' || b.type === 'queue') {
+                  // 如果缓存里没有这个ID对应的名字，就加入待查询队列
+                  const id = b.id || b.namespace_id || b.bucket_name || b.service || b.queue_name;
+                  if (id && !resourceMap[id]) {
+                      typesToFetch.add(b.type);
+                  }
+              }
+          });
+
+          // 并行获取缺失的资源列表
+          const promises = Array.from(typesToFetch).map(type => 
+              apiCall({ action: 'listResources', type: type }).then(res => {
+                  if (res.success && res.result) {
+                      res.result.forEach(r => {
+                          const name = r.title || r.name || r.queue_name || r.script_name;
+                          const val = r.uuid || r.id || r.queue_name || r.script_name || r.name;
+                          if (val && name) resourceMap[val] = name;
+                      });
+                  }
+              })
+          );
+
+          if (promises.length > 0) {
+              await Promise.all(promises);
+              renderBindings(); // 重新渲染以显示名称
+          }
+      }
+
       async function updateBindInputs() {
          const type = $('bind-type').value;
          const select = $('bind-select'); const loading = $('res-loading'); 
@@ -1326,7 +1397,9 @@ function renderUI() {
                  select.classList.remove('hidden');
                  select.innerHTML = res.result.map(r => {
                      const name = r.title || r.name || r.queue_name || r.script_name || r.id; 
-                     const val = r.uuid || r.id || r.queue_name || r.script_name || r.name; 
+                     const val = r.uuid || r.id || r.queue_name || r.script_name || r.name;
+                     // [V7.4] 顺便缓存一下
+                     if(val && name) resourceMap[val] = name;
                      return \`<option value="\${val}">\${name} (\${val ? val.substring(0,8) : ''}...)</option>\`;
                  }).join('');
                  if(select.options.length > 0) $('bind-id').value = select.options[0].value;
@@ -1391,7 +1464,11 @@ function renderUI() {
             if(action === 'listScripts') { $('script-select').innerHTML = res.result.map(s => \`<option value="\${s.id}">\${s.id}</option>\`).join(''); showToast("已更新"); }
             else if(action === 'fetch') { 
                 if(editor) { editor.getModel().setValue(res.code); }
-                currentBindings = res.bindings || []; renderBindings(); showToast("拉取成功"); 
+                currentBindings = res.bindings || []; 
+                renderBindings(); 
+                showToast("拉取成功"); 
+                // [V7.4] 拉取成功后，自动反查资源名称
+                autoResolveResourceNames();
             }
             else if(action === 'deploy') showToast("🎉 部署成功");
         } else showToast(res.errors?.[0]?.message || "失败", true);
@@ -1403,33 +1480,92 @@ function renderUI() {
          if (type === 'kv_namespace') return 'KV空间';
          if (type === 'r2_bucket') return 'R2存储';
          if (type === 'service') return 'Service';
-         if (type === 'plain_text') return '文本';
-         if (type === 'secret_text') return '密钥';
+         if (type === 'queue') return 'Queue 队列';
+         if (type === 'plain_text') return 'Plain Text';
+         if (type === 'secret_text') return 'Secret Key';
+         if (type === 'json') return 'JSON';
          return type;
       }
 
+      // [V7.4 重构] 渲染绑定列表：优先显示缓存中的友好名称
       function renderBindings() {
          const container = $('binding-container');
-         if (!currentBindings || currentBindings.length === 0) { container.innerHTML = '<span class="text-xs text-slate-400 italic">无绑定</span>'; return; }
+         if (!currentBindings || currentBindings.length === 0) { 
+            container.innerHTML = '<div class="text-center text-slate-400 italic py-4">暂无绑定，点击右上方 + 添加</div>'; 
+            return; 
+         }
+         
          container.innerHTML = currentBindings.map((b, index) => {
-             // [V7.1] 根据图片样式优化显示逻辑: 显示 "Variable (Type)"
-             let colorClass = "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
+             const type = b.type;
+             let val = '';
+             let cardClass = 'type-resource'; // 默认资源蓝
              
-             if(b.type === 'plain_text' || b.type === 'json') colorClass = "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800";
-             else if(b.type === 'secret_text') colorClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800";
-             else if(b.type === 'kv_namespace') colorClass = "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800";
-             else if(b.type === 'd1') colorClass = "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800";
-             
-             const label = \`\${b.name || b.binding} <span class="opacity-70 text-xs ml-1 font-normal">(\${getFriendlyType(b.type)})</span>\`;
-             
-             return \`<span class="binding-tag \${colorClass}">\${label} <span onclick="confirmRemoveBinding(\${index})" class="binding-del">&times;</span></span>\`;
+             // 1. 提取 Value / Resource ID
+             if (type === 'plain_text' || type === 'json') {
+                 val = b.text;
+                 cardClass = 'type-var'; // 变量紫
+             } else if (type === 'secret_text') {
+                 val = '(受保护的密钥)';
+                 cardClass = 'type-secret'; // 密钥橙
+             } else if (type === 'kv_namespace') {
+                 val = b.namespace_id;
+             } else if (type === 'd1') {
+                 val = b.id;
+             } else if (type === 'r2_bucket') {
+                 val = b.bucket_name;
+             } else if (type === 'service') {
+                 val = b.service;
+             } else if (type === 'queue') {
+                 val = b.queue_name;
+             } else {
+                 val = b.id || b.namespace_id || b.bucket_name || b.name || 'enabled';
+             }
+
+             // [V7.4] 尝试从全局缓存中获取友好名称
+             const friendlyName = resourceMap[val];
+             const displayVal = friendlyName ? friendlyName : val;
+             const showId = friendlyName && (val !== friendlyName); // 如果有友好名称且不等于ID，则显示ID辅助
+
+             return \`
+               <div class="binding-card \${cardClass}">
+                  <div class="card-del-btn" onclick="confirmRemoveBinding(\${index})" title="移除">&times;</div>
+                  <div class="binding-header">
+                     <span class="binding-name">\${b.name || b.binding}</span>
+                     <span class="binding-type-badge">\${getFriendlyType(type)}</span>
+                  </div>
+                  <div class="binding-details">
+                     <div class="detail-row">
+                        <span class="detail-label">\${friendlyName ? '资源名:' : '资源/值:'}</span>
+                        <span class="text-slate-600 dark:text-slate-300 font-mono font-bold">\${displayVal}</span>
+                     </div>
+                     \${showId ? \`<div class="text-xs text-slate-400 mt-1 break-all">(ID: \${val})</div>\` : ''}
+                  </div>
+               </div>
+             \`;
          }).join('');
       }
 
       function confirmRemoveBinding(index) { bindingToRemoveIndex = index; $('remove-binding-modal').classList.add('active'); }
       function executeRemoveBinding() { if(bindingToRemoveIndex !== null) currentBindings.splice(bindingToRemoveIndex, 1); renderBindings(); closeModal('remove-binding-modal'); }
       function openDeployModal() { if(!$('script-select').value) return showToast("请先选择脚本", true); $('deploy-modal').classList.add('active'); }
-      async function executeDeploy() { closeModal('deploy-modal'); const btn = $('p-btn'); btn.disabled = true; btn.innerText = "⌛ 正在部署..."; await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(currentBindings) }); btn.disabled = false; btn.innerText = "🚀 立即部署 (Deploy)"; }
+      
+      // [V7.3] 部署时清洗数据: 移除 _resourceName 字段 (虽然 V7.4 主要靠 resourceMap，但保留清洗逻辑是好习惯)
+      async function executeDeploy() { 
+          closeModal('deploy-modal'); 
+          const btn = $('p-btn'); 
+          btn.disabled = true; 
+          btn.innerText = "⌛ 正在部署..."; 
+          
+          // 清洗数据，防止将 UI 辅助字段发送给 Cloudflare
+          const cleanBindings = currentBindings.map(b => {
+             const { _resourceName, ...rest } = b;
+             return rest;
+          });
+
+          await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(cleanBindings) }); 
+          btn.disabled = false; 
+          btn.innerText = "🚀 立即部署 (Deploy)"; 
+      }
       
       function confirmAddBinding() {
          let newBind = {};
@@ -1455,6 +1591,16 @@ function renderUI() {
              else if(type === 'ai') newBind.binding = name; 
              else if(type === 'version_metadata') newBind.binding = name;
              else if(type === 'browser_rendering') newBind.binding = name;
+
+             // [V7.4] 尝试捕获并缓存资源名称
+             const select = $('bind-select');
+             if (!select.classList.contains('hidden') && select.value === idVal) {
+                 const selectedText = select.options[select.selectedIndex].text;
+                 // 格式通常是 "Name (ID_PREFIX...)"
+                 const rName = selectedText.split(' (')[0];
+                 resourceMap[idVal] = rName; // 存入全局缓存
+             }
+
          } else {
              const type = $('var-type').value;
              const val = $('var-value').value;
