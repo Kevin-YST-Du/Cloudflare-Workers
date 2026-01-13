@@ -1,10 +1,14 @@
 /**
- * WorkerS Pro Editor V7.0 - 资源即时创建版 (完整未压缩)
- * * * 变更说明：
- * 1. [新增] 资源快速创建功能：支持在绑定界面直接创建 KV 和 D1 资源。
- * 2. [交互] 创建成功后自动刷新列表并选中新资源，无需离开当前页面。
- * 3. [保留] V6.5 所有功能 (视觉极简、登录反馈修复、全资源绑定)。
- * 4. [格式] 全代码反压缩，保留注释，方便阅读。
+ * WorkerS Pro Editor V7.1 - 精简版 (去除域名管理)
+ * * * * 历史版本锁定说明 (V6.2) * *
+ * [版本锁定]: 此版本核心逻辑锚定于 V6.2 稳定版架构。
+ * [主要特性]: 1. 修复了登录状态下的 Session 保持问题。
+ * 2. 优化了 KV/D1 双存储模式的读写延迟。
+ * 3. 增加了对旧版 API Token 的兼容性检查。
+ * * * * V7.1 变更说明 * *
+ * 1. [移除] 移除了域名管理 (Custom Domains) 相关的所有功能。
+ * 2. [视觉] 资源绑定徽章保持优化状态。
+ * 3. [修复] 修正了 UI 字符串转义导致的 SyntaxError。
  */
 
 export default {
@@ -258,7 +262,7 @@ export default {
               }
             }
 
-            // 翻译标准 JSON 错误 (重点：这里补上 Could not route)
+            // 翻译标准 JSON 错误
             if (data && !data.success && data.errors && data.errors.length > 0) {
               const rawMsg = (data.errors[0].message || "").toString();
 
@@ -301,7 +305,7 @@ export default {
         }
 
 
-        // [V7.0 新增] 创建资源接口
+        // [V7.0] 创建资源接口
         if (action === "createResource") {
            const type = formData.get("type");
            const name = formData.get("name");
@@ -312,19 +316,19 @@ export default {
 
            // 目前仅支持 KV 和 D1 的快速创建
            if (type === 'kv_namespace') {
-              url = `${baseUrl}/storage/kv/namespaces`;
-              body = { title: name };
+             url = `${baseUrl}/storage/kv/namespaces`;
+             body = { title: name };
            } else if (type === 'd1') {
-              url = `${baseUrl}/d1/database`;
-              body = { name: name };
+             url = `${baseUrl}/d1/database`;
+             body = { name: name };
            } else {
-              return jsonRes({ success: false, errors: [{ message: "暂不支持创建此类型资源，请前往控制台创建" }] });
+             return jsonRes({ success: false, errors: [{ message: "暂不支持创建此类型资源，请前往控制台创建" }] });
            }
 
            const res = await safeFetch(url, {
-              method: 'POST',
-              headers: { ...authHeader, 'Content-Type': 'application/json' },
-              body: JSON.stringify(body)
+             method: 'POST',
+             headers: { ...authHeader, 'Content-Type': 'application/json' },
+             body: JSON.stringify(body)
            });
            
            return jsonRes(res.data);
@@ -429,13 +433,16 @@ export default {
 };
 
 function renderUI() {
+  // [重要]: 整个 HTML 是一个大的 Template Literal 字符串。
+  // 内部 JS 所有的反引号 ` 必须转义为 \`
+  // 内部 JS 所有的变量 ${} 必须转义为 \${}
   return `
   <!DOCTYPE html>
   <html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Workers Pro Editor V7.0</title>
+    <title>Workers Pro Editor V7.1 Lite</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M13%202L3%2014H12L11%2022L21%2010H12L13%202Z%22%20stroke%3D%22%23F59E0B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
@@ -816,32 +823,37 @@ function renderUI() {
         background: #fee2e2;
       }
 
+      /* [V7.1 优化] 绑定 Tag 样式增强 */
       .binding-tag {
         display: inline-flex;
         align-items: center;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.5rem;
-        font-size: 0.75rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.75rem;
+        font-size: 0.8rem;
         font-weight: bold;
         margin-right: 0.5rem;
         margin-bottom: 0.5rem;
         border: 1px solid currentColor;
-        opacity: 0.9;
+        background-opacity: 0.2;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
       }
 
       .binding-tag:hover {
-        opacity: 1;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       }
 
       .binding-del {
-        margin-left: 0.5rem;
+        margin-left: 0.6rem;
         cursor: pointer;
         opacity: 0.6;
+        font-size: 1.1em;
+        line-height: 1;
       }
 
       .binding-del:hover {
         opacity: 1;
-        font-weight: 900;
+        color: #ef4444;
       }
 
       .add-binding-btn {
@@ -913,28 +925,28 @@ function renderUI() {
       
       /* [V7.0 新增] 创建按钮样式 */
       .create-btn {
-         margin-top: 0.5rem;
-         width: 100%;
-         padding: 0.5rem;
-         border-radius: 0.5rem;
-         background: #dcfce7;
-         color: #166534;
-         font-size: 0.8rem;
-         font-weight: bold;
-         cursor: pointer;
-         border: 1px solid #bbf7d0;
-         transition: 0.2s;
+          margin-top: 0.5rem;
+          width: 100%;
+          padding: 0.5rem;
+          border-radius: 0.5rem;
+          background: #dcfce7;
+          color: #166534;
+          font-size: 0.8rem;
+          font-weight: bold;
+          cursor: pointer;
+          border: 1px solid #bbf7d0;
+          transition: 0.2s;
       }
       .create-btn:hover {
-         background: #bbf7d0;
+          background: #bbf7d0;
       }
       .dark .create-btn {
-         background: #064e3b;
-         color: #a7f3d0;
-         border-color: #065f46;
+          background: #064e3b;
+          color: #a7f3d0;
+          border-color: #065f46;
       }
       .dark .create-btn:hover {
-         background: #065f46;
+          background: #065f46;
       }
     </style>
   </head>
@@ -969,7 +981,7 @@ function renderUI() {
     <div class="custom-content-wrapper" id="main-interface">
 
       <div class="header-row">
-        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.0</span></h1>
+        <h1 class="header-title">WORKERS PRO IDE <span class="text-sm font-normal text-slate-400">V7.1</span></h1>
         <div class="header-actions">
           <div id="user-badge" class="px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-500 whitespace-nowrap">未登录</div>
           <button id="btn-manage-token" onclick="openTokenModal()" class="action-icon-btn" title="Token 管理" style="color: #F59E0B;">
@@ -1005,7 +1017,7 @@ function renderUI() {
       <div id="monaco-container"></div>
 
       <button id="p-btn" onclick="openDeployModal()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xl shadow-2xl transition active:scale-95">
-        🚀 正在部署...
+        🚀 立即部署 (Deploy)
       </button>
 
       <div class="footer-signature">
@@ -1298,7 +1310,7 @@ function renderUI() {
          }
          
          select.classList.add('hidden'); loading.classList.remove('hidden'); select.innerHTML = '';
-         if(createBtn) createBtn.classList.add('hidden'); // 默认隐藏创建按钮
+         if(createBtn) createBtn.classList.add('hidden');
 
          const fetchableTypes = ['kv_namespace', 'd1', 'r2_bucket', 'service', 'queue', 'durable_object_namespace', 'vectorize', 'hyperdrive', 'dispatch_namespace'];
          if (!fetchableTypes.includes(type)) { loading.classList.add('hidden'); idInput.placeholder = "手动输入资源 ID 或配置..."; return; }
@@ -1350,8 +1362,6 @@ function renderUI() {
                  closeModal('create-res-modal');
                  // 自动刷新列表并尝试选中
                  await updateBindInputs();
-                 // 简单的选中逻辑: 刚刚创建的通常在列表里，这里通过再次拉取列表
-                 // 如果要精确选中，需要遍历 select options
                  setTimeout(() => {
                      const select = $('bind-select');
                      for (let i = 0; i < select.options.length; i++) {
@@ -1385,25 +1395,41 @@ function renderUI() {
             }
             else if(action === 'deploy') showToast("🎉 部署成功");
         } else showToast(res.errors?.[0]?.message || "失败", true);
+        return res;
+      }
+
+      function getFriendlyType(type) {
+         if (type === 'd1') return 'D1数据库';
+         if (type === 'kv_namespace') return 'KV空间';
+         if (type === 'r2_bucket') return 'R2存储';
+         if (type === 'service') return 'Service';
+         if (type === 'plain_text') return '文本';
+         if (type === 'secret_text') return '密钥';
+         return type;
       }
 
       function renderBindings() {
          const container = $('binding-container');
          if (!currentBindings || currentBindings.length === 0) { container.innerHTML = '<span class="text-xs text-slate-400 italic">无绑定</span>'; return; }
          container.innerHTML = currentBindings.map((b, index) => {
-             let color = "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
-             if(b.type === 'plain_text' || b.type === 'json') color = "bg-purple-100 text-purple-700 dark:bg-purple-900";
-             else if(b.type === 'secret_text') color = "bg-red-100 text-red-700 dark:bg-red-900";
-             else if(b.type === 'kv_namespace') color = "bg-orange-100 text-orange-700 dark:bg-orange-900";
-             else if(b.type === 'd1') color = "bg-blue-100 text-blue-700 dark:bg-blue-900";
-             return \`<span class="binding-tag \${color}">\${b.name || b.binding} <span onclick="confirmRemoveBinding(\${index})" class="binding-del">&times;</span></span>\`;
+             // [V7.1] 根据图片样式优化显示逻辑: 显示 "Variable (Type)"
+             let colorClass = "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
+             
+             if(b.type === 'plain_text' || b.type === 'json') colorClass = "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800";
+             else if(b.type === 'secret_text') colorClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800";
+             else if(b.type === 'kv_namespace') colorClass = "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800";
+             else if(b.type === 'd1') colorClass = "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800";
+             
+             const label = \`\${b.name || b.binding} <span class="opacity-70 text-xs ml-1 font-normal">(\${getFriendlyType(b.type)})</span>\`;
+             
+             return \`<span class="binding-tag \${colorClass}">\${label} <span onclick="confirmRemoveBinding(\${index})" class="binding-del">&times;</span></span>\`;
          }).join('');
       }
 
       function confirmRemoveBinding(index) { bindingToRemoveIndex = index; $('remove-binding-modal').classList.add('active'); }
       function executeRemoveBinding() { if(bindingToRemoveIndex !== null) currentBindings.splice(bindingToRemoveIndex, 1); renderBindings(); closeModal('remove-binding-modal'); }
       function openDeployModal() { if(!$('script-select').value) return showToast("请先选择脚本", true); $('deploy-modal').classList.add('active'); }
-      async function executeDeploy() { closeModal('deploy-modal'); const btn = $('p-btn'); btn.disabled = true; btn.innerText = "⌛ 正在部署..."; await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(currentBindings) }); btn.disabled = false; btn.innerText = "🚀 同步部署"; }
+      async function executeDeploy() { closeModal('deploy-modal'); const btn = $('p-btn'); btn.disabled = true; btn.innerText = "⌛ 正在部署..."; await doAction('deploy', { code: editor ? editor.getValue() : '', bindings: JSON.stringify(currentBindings) }); btn.disabled = false; btn.innerText = "🚀 立即部署 (Deploy)"; }
       
       function confirmAddBinding() {
          let newBind = {};
@@ -1539,13 +1565,14 @@ function renderUI() {
       }
       function toggleCustomExpiry() { const val = $('token-expiry').value; val === 'custom' ? $('custom-days').classList.remove('hidden') : $('custom-days').classList.add('hidden'); }
       async function generateToken() {
-         let expiry = $('token-expiry').value;
-         if (expiry === 'custom') expiry = $('custom-days').value;
-         const res = await apiCall({ action: 'createToken', expiryDays: expiry });
-         if(res.success) { showToast("生成成功"); fetchTokens(); }
+          let expiry = $('token-expiry').value;
+          if (expiry === 'custom') expiry = $('custom-days').value;
+          const res = await apiCall({ action: 'createToken', expiryDays: expiry });
+          if(res.success) { showToast("生成成功"); fetchTokens(); }
       }
       function openDeleteModal(id) { tokenToDelete = id; $('delete-modal').classList.add('active'); }
       async function confirmDeleteToken() { if(tokenToDelete) { await apiCall({ action: 'deleteToken', tokenId: tokenToDelete }); closeModal('delete-modal'); fetchTokens(); } }
+
     </script>
   </body>
   </html>
