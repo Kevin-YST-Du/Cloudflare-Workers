@@ -135,12 +135,19 @@ export default {
 
     // --- Token 生成辅助函数 ---
     const generateComplexToken = async () => {
-      const array = new Uint8Array(64);
-      crypto.getRandomValues(array);
-      const randomPart = Array.from(array, dec => dec.toString(16).padStart(2, "0")).join('');
-      const uuid = crypto.randomUUID().replace(/-/g, '');
-      return `tk_${uuid.substring(0, 8)}${randomPart}${uuid.substring(24)}`;
-    };
+    // 120 字节 = 240 位 hex
+    const array = new Uint8Array(120);
+    crypto.getRandomValues(array);
+
+    const randomPart = Array.from(array, d =>
+    d.toString(16).padStart(2, '0')
+  ).join('');
+
+    const uuid = crypto.randomUUID().replace(/-/g, '');
+
+    return `tk_${uuid.slice(0, 8)}${randomPart}${uuid.slice(24)}`;
+};
+
 
     if (request.method === "POST") {
       try {
@@ -1696,33 +1703,220 @@ function renderUI() {
           }, 450); 
       }
 
-      function doLogout() { localStorage.removeItem('wpe_session'); location.reload(); }
-      function toggleTheme() { const isDark = document.body.classList.toggle('dark'); if(editor) monaco.editor.setTheme(isDark?'vs-dark':'vs'); localStorage.setItem('theme', isDark?'dark':'light'); }
-      function editorSelectAll() { if(editor) { editor.focus(); editor.setSelection(editor.getModel().getFullModelRange()); } }
-      function editorCopyAll() { if(editor) navigator.clipboard.writeText(editor.getValue()).then(()=>showToast("已复制")); }
-      async function editorPaste() { if(editor) { try { const t = await navigator.clipboard.readText(); if(t) editor.executeEdits('p', [{ range: editor.getSelection(), text: t }]); } catch(e){} } }
-      function copyText(t) { navigator.clipboard.writeText(t).then(()=>showToast("已复制")); }
-      function openTokenModal() { $('token-modal').classList.add('active'); fetchTokens(); }
-      async function fetchTokens() { try { const res = await apiCall({ action: 'listTokens' }); if(res.success) renderTokenList(res.result); } catch(e) {} }
+      // 退出登录：清除本地 session 并刷新页面
+      function doLogout() {
+        localStorage.removeItem('wpe_session');
+        location.reload();
+      }
+
+      // 切换暗色 / 亮色主题，并同步 Monaco 编辑器主题
+      function toggleTheme() {
+        const isDark = document.body.classList.toggle('dark');
+
+        if (editor) {
+          monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs');
+        }
+
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      }
+
+      // 编辑器全选
+      function editorSelectAll() {
+        if (editor) {
+          editor.focus();
+          editor.setSelection(editor.getModel().getFullModelRange());
+        }
+      }
+
+      // 复制编辑器全部内容
+      function editorCopyAll() {
+        if (editor) {
+          navigator.clipboard
+            .writeText(editor.getValue())
+            .then(() => showToast("已复制"));
+        }
+      }
+
+      // 从剪贴板读取并粘贴到编辑器当前选区
+      async function editorPaste() {
+        if (editor) {
+          try {
+            const t = await navigator.clipboard.readText();
+            if (t) {
+              editor.executeEdits('p', [
+                {
+                  range: editor.getSelection(),
+                  text: t
+                }
+              ]);
+            }
+          } catch (e) {
+            // 可能是权限/浏览器不支持读剪贴板
+          }
+        }
+      }
+
+      // 复制指定文本
+      function copyText(t) {
+        navigator.clipboard
+          .writeText(t)
+          .then(() => showToast("已复制"));
+      }
+
+      // 打开 Token 弹窗并拉取列表
+      function openTokenModal() {
+        $('token-modal').classList.add('active');
+        fetchTokens();
+      }
+
+      // 请求 Token 列表
+      async function fetchTokens() {
+        try {
+          const res = await apiCall({ action: 'listTokens' });
+          if (res.success) {
+            renderTokenList(res.result);
+          }
+        } catch (e) {
+          // 请求失败忽略
+        }
+      }
+
+      // 渲染 Token 列表到页面
       function renderTokenList(tokens) {
         const container = $('token-list');
-        if(!tokens || tokens.length === 0) return container.innerHTML = '<div class="text-center text-slate-400">无 Token</div>';
-        const formatTime = ts => { const d = new Date(ts); return \`\${d.getFullYear()}/\${d.getMonth()+1}/\${d.getDate()}\`; };
-        container.innerHTML = tokens.map(t => \`
-           <div class="token-card">
-              <div class="token-info"><div class="token-val" onclick="copyText('\${t.token}')">\${t.token}</div><div class="token-meta">创建: \${formatTime(t.created)} | 过期: \${t.expiry===-1?'永久':formatTime(t.expiry)}</div></div>
-              <div onclick="openDeleteModal('\${t.id}')" class="token-del-btn" title="删除"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
-           </div>\`).join('');
+        container.replaceChildren();
+
+        if (!tokens || tokens.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'text-center text-slate-400';
+          empty.textContent = '无 Token';
+          container.append(empty);
+          return;
+        }
+
+        function formatTime(ts) {
+          const d = new Date(ts);
+          return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+        }
+
+        function svgTrashIcon() {
+          const svgNS = 'http://www.w3.org/2000/svg';
+          const svg = document.createElementNS(svgNS, 'svg');
+          svg.setAttribute('width', '20');
+          svg.setAttribute('height', '20');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('fill', 'none');
+          svg.setAttribute('stroke', 'currentColor');
+          svg.setAttribute('stroke-width', '2');
+          svg.setAttribute('stroke-linecap', 'round');
+          svg.setAttribute('stroke-linejoin', 'round');
+
+          const polyline = document.createElementNS(svgNS, 'polyline');
+          polyline.setAttribute('points', '3 6 5 6 21 6');
+
+          const path = document.createElementNS(svgNS, 'path');
+          path.setAttribute('d', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+
+          svg.append(polyline, path);
+          return svg;
+        }
+
+        tokens.forEach(function (t) {
+          const card = document.createElement('div');
+          card.className = 'token-card';
+
+          const info = document.createElement('div');
+          info.className = 'token-info';
+
+          const val = document.createElement('div');
+          val.className = 'token-val';
+          val.textContent = t.token;
+          val.onclick = function () {
+            copyText(t.token);
+          };
+
+          const meta = document.createElement('div');
+          meta.className = 'token-meta';
+
+          const createdLabel = document.createElement('span');
+          createdLabel.textContent = '创建: ';
+
+          const createdVal = document.createElement('span');
+          createdVal.textContent = formatTime(t.created);
+
+          const sep = document.createElement('span');
+          sep.textContent = ' | ';
+
+          const expiryLabel = document.createElement('span');
+          expiryLabel.textContent = '过期: ';
+
+          const expiryVal = document.createElement('span');
+          expiryVal.textContent = t.expiry === -1 ? '永久' : formatTime(t.expiry);
+
+          meta.append(createdLabel, createdVal, sep, expiryLabel, expiryVal);
+
+          info.append(val, meta);
+
+          const del = document.createElement('div');
+          del.className = 'token-del-btn';
+          del.title = '删除';
+          del.onclick = function () {
+            openDeleteModal(t.id);
+          };
+
+          del.append(svgTrashIcon());
+
+          card.append(info, del);
+          container.append(card);
+        });
       }
-      function toggleCustomExpiry() { const val = $('token-expiry').value; val === 'custom' ? $('custom-days').classList.remove('hidden') : $('custom-days').classList.add('hidden'); }
+
+      // 切换自定义过期天数输入框显示/隐藏
+      function toggleCustomExpiry() {
+        const val = $('token-expiry').value;
+        if (val === 'custom') {
+          $('custom-days').classList.remove('hidden');
+        } else {
+          $('custom-days').classList.add('hidden');
+        }
+      }
+
+      // 生成 Token
       async function generateToken() {
-          let expiry = $('token-expiry').value;
-          if (expiry === 'custom') expiry = $('custom-days').value;
-          const res = await apiCall({ action: 'createToken', expiryDays: expiry });
-          if(res.success) { showToast("生成成功"); fetchTokens(); }
+        let expiry = $('token-expiry').value;
+
+        if (expiry === 'custom') {
+          expiry = $('custom-days').value;
+        }
+
+        const res = await apiCall({
+          action: 'createToken',
+          expiryDays: expiry
+        });
+
+        if (res.success) {
+          showToast("生成成功");
+          fetchTokens();
+        }
       }
-      function openDeleteModal(id) { tokenToDelete = id; $('delete-modal').classList.add('active'); }
-      async function confirmDeleteToken() { if(tokenToDelete) { await apiCall({ action: 'deleteToken', tokenId: tokenToDelete }); closeModal('delete-modal'); fetchTokens(); } }
+
+      // 打开删除确认弹窗
+      function openDeleteModal(id) {
+        tokenToDelete = id;
+        $('delete-modal').classList.add('active');
+      }
+
+      // 确认删除 Token
+      async function confirmDeleteToken() {
+        if (tokenToDelete) {
+          await apiCall({
+            action: 'deleteToken',
+            tokenId: tokenToDelete
+          });
+          closeModal('delete-modal');
+          fetchTokens();
+        }
+      }
 
     </script>
   </body>
