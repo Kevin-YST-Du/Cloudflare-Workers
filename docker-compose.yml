@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  workers:
+    # [镜像地址] 请确保这里的用户名和你 GitHub 仓库一致
+    image: ghcr.io/kevin-yst-du/workers:latest
+    
+    # 容器名称
+    container_name: workers
+    
+    # 自动重启策略
+    restart: always
+    
+    # [网络模式] Host 模式，直接使用宿主机端口 21020
+    network_mode: "host"
+
+    # [持久化存储] 挂载数据卷
+    volumes:
+      - ./data:/app/data
+
+    # [环境变量配置]
+    environment:
+      # --- 基础配置 ---
+      - PORT=21020                  # 监听端口 (已修改为 21020)
+      - DB_PATH=/app/data/database.sqlite  # 数据库路径
+      
+      # --- 跨域配置 (可选) ---
+      - ALLOW_CROSS_DOMAIN=true     # 是否允许跨域请求
