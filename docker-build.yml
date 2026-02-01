@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  workers:
+    # [构建配置] 使用当前目录下的 Dockerfile 构建
+    build: .
+    
+    # 容器名称
+    container_name: workers
+    
+    # 自动重启策略
+    restart: always
+    
+    # [网络模式] Host 模式，直接使用宿主机端口 21020
+    network_mode: "host"
+
+    # [持久化存储] 挂载数据卷，防止重启丢失数据库
+    volumes:
+      - ./data:/app/data
+
+    # [环境变量配置]
+    environment:
+      # --- 基础配置 ---
+      - PORT=21020                  # 监听端口
+      - DB_PATH=/app/data/database.sqlite  # 数据库路径 (必须在挂载卷内)
+      
+      # --- 跨域配置 (可选) ---
+      - ALLOW_CROSS_DOMAIN=true     # 是否允许跨域请求
