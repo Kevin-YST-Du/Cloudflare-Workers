@@ -14,7 +14,7 @@ const path = require('path');
 const fs = require('fs');
 
 // --- 配置区 ---
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 21020;
 const DB_PATH = process.env.DB_PATH || 'database.sqlite';
 const ALLOW_CROSS_DOMAIN = process.env.ALLOW_CROSS_DOMAIN === 'true';
 
