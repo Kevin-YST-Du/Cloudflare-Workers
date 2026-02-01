@@ -1,0 +1,111 @@
+name: 构建二进制文件
+
+on:
+  # 1. 手动触发：增加了版本号输入框
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如 v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      body:
+        description: '更新说明'
+        required: false
+        default: '手动构建发布'
+
+  # 2. 自动触发：推送 v* 标签时
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # 必须有写权限才能发 Release
+
+jobs:
+  # 第一步：构建 (使用矩阵以支持 better-sqlite3 原生模块)
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: node18-linux-x64
+            output: workers
+          - os: windows-latest
+            target: node18-win-x64
+            output: workers.exe
+          - os: macos-latest
+            target: node18-macos-x64
+            output: workers
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Binaries with PKG
+        run: |
+          npx pkg . --targets ${{ matrix.target }} --output ${{ matrix.output }}
+
+      # 上传构建产物供 Release 步骤使用
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}
+          path: ${{ matrix.output }}
+
+  # 第二步：发布 (收集所有构建产物并发布)
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 下载所有构建产物
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # 整理文件结构，重命名以便发布
+      - name: Prepare Assets
+        run: |
+          mkdir -p release_assets
+          cp artifacts/binary-ubuntu-latest/workers release_assets/workers-linux
+          cp artifacts/binary-windows-latest/workers.exe release_assets/workers.exe
+          cp artifacts/binary-macos-latest/workers release_assets/workers-macos
+          ls -l release_assets/
+
+      # --- 关键修改：生成 Release 标签名 (完全按照你的示范) ---
+      - name: Determine Tag Name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "name=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      # --- 发布 Release ---
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          # 强制指定 Release 的标签名
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Release ${{ steps.tag.outputs.name }}
+          body: ${{ inputs.body || 'Auto-generated release' }}
+          files: release_assets/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
